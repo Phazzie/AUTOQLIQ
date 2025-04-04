@@ -1,0 +1,14 @@
+[
+  { "type": "Navigate", "url": "https://login.example.com" },
+  { "type": "Type", "selector": "#username-input", "value_type": "credential", "value_key": "example_login.username" },
+  { "type": "Type", "selector": "#password-input", "value_type": "credential", "value_key": "example_login.password" },
+  { "type": "Click", "selector": "#login-button", "check_success_selector": "#dashboard-title", "check_failure_selector": "#login-error-message" },
+  { "type": "Wait", "duration_seconds": 3 },
+  { "type": "Click", "selector": "#menu-item-reports" },
+  { "type": "Wait", "duration_seconds": 2 },
+  { "type": "Click", "selector": "#generate-report-button" },
+  { "type": "Wait", "duration_seconds": 8 },
+  { "type": "Screenshot", "file_path": "report_screenshot.png" },
+  { "type": "Click", "selector": "#logout-link" },
+  { "type": "Wait", "duration_seconds": 5 }
+]
