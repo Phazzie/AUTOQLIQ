@@ -79,8 +79,7 @@ class TestDomainModelIntegration(unittest.TestCase):
         self.driver = MockWebDriver()
         self.credential_repo = MockCredentialRepository()
 
-        # Set the credential repository for TypeAction
-        TypeAction.set_credential_repository(self.credential_repo)
+        # No need to set class-level credential repository anymore
 
     def tearDown(self):
         """Tear down test fixtures."""
@@ -107,7 +106,7 @@ class TestDomainModelIntegration(unittest.TestCase):
         # Create actions
         navigate_action = NavigateAction(url="https://example.com")
         click_action = ClickAction(selector="#login-button")
-        type_action = TypeAction(selector="#username", value_type="credential", value_key="test_login.username")
+        type_action = TypeAction(selector="#username", value_type="credential", value_key="test_login.username", credential_repository=self.credential_repo)
         wait_action = WaitAction(duration_seconds=1)
         screenshot_action = ScreenshotAction(file_path="test.png")
 
@@ -137,8 +136,8 @@ class TestDomainModelIntegration(unittest.TestCase):
         actions = [
             NavigateAction(url="https://example.com"),
             ClickAction(selector="#login-button"),
-            TypeAction(selector="#username", value_type="credential", value_key="test_login.username"),
-            TypeAction(selector="#password", value_type="credential", value_key="test_login.password"),
+            TypeAction(selector="#username", value_type="credential", value_key="test_login.username", credential_repository=self.credential_repo),
+            TypeAction(selector="#password", value_type="credential", value_key="test_login.password", credential_repository=self.credential_repo),
             ClickAction(selector="#login-button"),
             WaitAction(duration_seconds=1)
         ]
@@ -174,7 +173,15 @@ class TestDomainModelIntegration(unittest.TestCase):
         ]
 
         # Create actions using factory
-        actions = [ActionFactory.create_action(action_dict) for action_dict in action_dicts]
+        actions = []
+        for action_dict in action_dicts:
+            action = ActionFactory.create_action(action_dict)
+            # Set credential repository for TypeAction instances
+            if isinstance(action, TypeAction):
+                action.credential_repository = self.credential_repo
+            actions.append(action)
+
+
 
         # Verify action types
         self.assertIsInstance(actions[0], NavigateAction)
@@ -196,7 +203,7 @@ class TestDomainModelIntegration(unittest.TestCase):
         actions = [
             NavigateAction(url="https://example.com"),
             ClickAction(selector="#login-button"),
-            TypeAction(selector="#username", value_type="credential", value_key="test_login.username")
+            TypeAction(selector="#username", value_type="credential", value_key="test_login.username", credential_repository=self.credential_repo)
         ]
 
         # Create workflow

@@ -61,12 +61,11 @@ class TestTypeAction(unittest.TestCase):
             "password": "password123"
         }
 
-        # Set the credential repository for TypeAction
-        TypeAction.set_credential_repository(self.credential_repo)
+        # No need to set class-level credential repository anymore
 
     def test_execute(self):
         driver = Mock(spec=IWebDriver)
-        action = TypeAction(selector="#username-input", value_type="credential", value_key="example_login.username")
+        action = TypeAction(selector="#username-input", value_type="credential", value_key="example_login.username", credential_repository=self.credential_repo)
         result = action.execute(driver)
 
         # Verify the credential repository was used
@@ -77,7 +76,7 @@ class TestTypeAction(unittest.TestCase):
         self.assertTrue(result.is_success())
 
     def test_to_dict(self):
-        action = TypeAction(selector="#username-input", value_type="credential", value_key="example_login.username")
+        action = TypeAction(selector="#username-input", value_type="credential", value_key="example_login.username", credential_repository=self.credential_repo)
         result = action.to_dict()
         self.assertEqual(result["type"], "Type")
         self.assertEqual(result["selector"], "#username-input")

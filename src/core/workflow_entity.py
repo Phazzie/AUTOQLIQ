@@ -70,14 +70,16 @@ class Workflow:
         Returns:
             A list of ActionResult objects, one for each action executed
         """
-        # Set credential repository for TypeAction if provided
-        if credential_repository:
-            TypeAction.set_credential_repository(credential_repository)
+        # No need to set class-level credential repository anymore
 
         results = []
 
         for action in self.actions:
-            result = action.execute(driver)
+            # Pass credential repository to execute if it's a TypeAction
+            if isinstance(action, TypeAction) and credential_repository:
+                result = action.execute(driver, credential_repository)
+            else:
+                result = action.execute(driver)
             results.append(result)
 
             # Stop execution if an action fails

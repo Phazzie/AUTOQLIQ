@@ -10,8 +10,7 @@ class WorkflowRunner:
         self.credential_repo = credential_repo
         self.workflow_repo = workflow_repo
 
-        # Set the credential repository for TypeAction
-        TypeAction.set_credential_repository(credential_repo)
+        # No need to set class-level credential repository anymore
 
     def run_workflow(self, workflow_name: str) -> List[ActionResult]:
         try:
@@ -19,7 +18,11 @@ class WorkflowRunner:
             results = []
 
             for action in actions:
-                result = action.execute(self.driver)
+                # Pass credential repository to execute if it's a TypeAction
+                if isinstance(action, TypeAction):
+                    result = action.execute(self.driver, self.credential_repo)
+                else:
+                    result = action.execute(self.driver)
                 results.append(result)
 
                 # Stop execution if an action fails

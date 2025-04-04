@@ -1,10 +1,10 @@
-from typing import Dict, Any, Optional, ClassVar
+from typing import Dict, Any, Optional
 from src.core.interfaces import IAction, IWebDriver, ICredentialRepository
 from src.core.action_base import ActionBase
 from src.core.action_result import ActionResult
-from src.core.exceptions import CredentialError
+from src.core.exceptions import CredentialError, ActionError, WebDriverError
 import time
-import json
+# Remove unused import
 
 class NavigateAction(ActionBase):
     def __init__(self, url: str, name: str = "Navigate"):
@@ -18,8 +18,13 @@ class NavigateAction(ActionBase):
         try:
             driver.get(self.url)
             return ActionResult.success(f"Navigated to {self.url}")
+        except WebDriverError as e:
+            # Handle WebDriverError specifically
+            return ActionResult.failure(f"WebDriver error navigating to {self.url}: {str(e)}")
         except Exception as e:
-            return ActionResult.failure(f"Failed to navigate to {self.url}: {str(e)}")
+            # Wrap other exceptions in ActionError for better context
+            error = ActionError(f"Failed to navigate to {self.url}", action_name=self.name, cause=e)
+            return ActionResult.failure(str(error))
 
     def to_dict(self) -> Dict[str, Any]:
         return {"type": "Navigate", "name": self.name, "url": self.url}
@@ -45,8 +50,13 @@ class ClickAction(ActionBase):
                 return ActionResult.failure("Login failed due to absence of success element.")
 
             return ActionResult.success(f"Clicked element {self.selector}")
+        except WebDriverError as e:
+            # Handle WebDriverError specifically
+            return ActionResult.failure(f"WebDriver error clicking element {self.selector}: {str(e)}")
         except Exception as e:
-            return ActionResult.failure(f"Failed to click element {self.selector}: {str(e)}")
+            # Wrap other exceptions in ActionError for better context
+            error = ActionError(f"Failed to click element {self.selector}", action_name=self.name, cause=e)
+            return ActionResult.failure(str(error))
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -58,40 +68,42 @@ class ClickAction(ActionBase):
         }
 
 class TypeAction(ActionBase):
-    # Class variable to store credential repository
-    _credential_repository: ClassVar[Optional[ICredentialRepository]] = None
-
-    @classmethod
-    def set_credential_repository(cls, repository: ICredentialRepository) -> None:
-        """Set the credential repository for all TypeAction instances."""
-        cls._credential_repository = repository
-
-    def __init__(self, selector: str, value_type: str, value_key: str, name: str = "Type"):
+    def __init__(self, selector: str, value_type: str, value_key: str, name: str = "Type", credential_repository: Optional[ICredentialRepository] = None):
         super().__init__(name)
         self.selector = selector
         self.value_type = value_type
         self.value_key = value_key
+        self.credential_repository = credential_repository
 
     def validate(self) -> bool:
         return bool(self.selector) and bool(self.value_type) and bool(self.value_key)
 
-    def execute(self, driver: IWebDriver) -> ActionResult:
+    def execute(self, driver: IWebDriver, credential_repository: Optional[ICredentialRepository] = None) -> ActionResult:
         try:
-            value = self._get_value()
+            # Use the provided credential repository or the one from initialization
+            repo_to_use = credential_repository or self.credential_repository
+            value = self._get_value(repo_to_use)
             driver.type_text(self.selector, value)
             return ActionResult.success(f"Typed text into element {self.selector}")
         except ValueError as e:
-            return ActionResult.failure(str(e))
+            # Handle value type errors specifically
+            return ActionResult.failure(f"Invalid value configuration: {str(e)}")
         except CredentialError as e:
+            # CredentialError already has good context
             return ActionResult.failure(str(e))
+        except WebDriverError as e:
+            # Handle WebDriverError specifically
+            return ActionResult.failure(f"WebDriver error typing text into {self.selector}: {str(e)}")
         except Exception as e:
-            return ActionResult.failure(f"Failed to type text into element {self.selector}: {str(e)}")
+            # Wrap other exceptions in ActionError for better context
+            error = ActionError(f"Failed to type text into element {self.selector}", action_name=self.name, cause=e)
+            return ActionResult.failure(str(error))
 
-    def _get_value(self) -> str:
+    def _get_value(self, credential_repository: Optional[ICredentialRepository] = None) -> str:
         if self.value_type == "credential":
-            # Check if credential repository is set
-            if not self._credential_repository:
-                raise CredentialError("Credential repository not set. Call TypeAction.set_credential_repository() first.")
+            # Check if credential repository is provided
+            if not credential_repository:
+                raise CredentialError("Credential repository not provided. Pass a credential repository to execute() or constructor.")
 
             # Parse credential key (format: "credential_name.field")
             parts = self.value_key.split(".")
@@ -101,7 +113,7 @@ class TypeAction(ActionBase):
             credential_name, field = parts
 
             # Get credential from repository
-            credential = self._credential_repository.get_by_name(credential_name)
+            credential = credential_repository.get_by_name(credential_name)
             if not credential:
                 raise CredentialError(f"Credential not found: {credential_name}", credential_name=credential_name)
 
@@ -129,14 +141,19 @@ class WaitAction(ActionBase):
         self.duration_seconds = duration_seconds
 
     def validate(self) -> bool:
-        return self.duration_seconds > 0
+        return isinstance(self.duration_seconds, int) and self.duration_seconds > 0
 
     def execute(self, driver: IWebDriver) -> ActionResult:
         try:
             time.sleep(self.duration_seconds)
             return ActionResult.success(f"Waited for {self.duration_seconds} seconds")
+        except TypeError as e:
+            # Handle type errors specifically
+            return ActionResult.failure(f"Invalid duration type: {str(e)}")
         except Exception as e:
-            return ActionResult.failure(f"Failed to wait: {str(e)}")
+            # Wrap other exceptions in ActionError for better context
+            error = ActionError(f"Failed to wait for {self.duration_seconds} seconds", action_name=self.name, cause=e)
+            return ActionResult.failure(str(error))
 
     def to_dict(self) -> Dict[str, Any]:
         return {"type": "Wait", "name": self.name, "duration_seconds": self.duration_seconds}
@@ -153,8 +170,16 @@ class ScreenshotAction(ActionBase):
         try:
             driver.take_screenshot(self.file_path)
             return ActionResult.success(f"Took screenshot and saved to {self.file_path}")
+        except WebDriverError as e:
+            # Handle WebDriverError specifically
+            return ActionResult.failure(f"WebDriver error taking screenshot: {str(e)}")
+        except IOError as e:
+            # Handle file I/O errors specifically
+            return ActionResult.failure(f"File error saving screenshot to {self.file_path}: {str(e)}")
         except Exception as e:
-            return ActionResult.failure(f"Failed to take screenshot: {str(e)}")
+            # Wrap other exceptions in ActionError for better context
+            error = ActionError(f"Failed to take screenshot", action_name=self.name, cause=e)
+            return ActionResult.failure(str(error))
 
     def to_dict(self) -> Dict[str, Any]:
         return {"type": "Screenshot", "name": self.name, "file_path": self.file_path}
