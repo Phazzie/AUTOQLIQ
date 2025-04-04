@@ -1,50 +1,79 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from src.core.interfaces import IAction, IWebDriver
-from src.core.exceptions import LoginFailedError
-from src.core.credentials import Credential
+from src.core.action_base import ActionBase, ActionResult
 import time
 import json
 
-class NavigateAction(IAction):
-    def __init__(self, url: str):
+class NavigateAction(ActionBase):
+    def __init__(self, url: str, name: str = "Navigate"):
+        super().__init__(name)
         self.url = url
 
-    def execute(self, driver: IWebDriver) -> None:
-        driver.get(self.url)
+    def validate(self) -> bool:
+        return bool(self.url)
+
+    def execute(self, driver: IWebDriver) -> ActionResult:
+        try:
+            driver.get(self.url)
+            return ActionResult.success(f"Navigated to {self.url}")
+        except Exception as e:
+            return ActionResult.failure(f"Failed to navigate to {self.url}: {str(e)}")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"type": "Navigate", "url": self.url}
+        return {"type": "Navigate", "name": self.name, "url": self.url}
 
-class ClickAction(IAction):
-    def __init__(self, selector: str, check_success_selector: str = None, check_failure_selector: str = None):
+class ClickAction(ActionBase):
+    def __init__(self, selector: str, name: str = "Click", check_success_selector: Optional[str] = None, check_failure_selector: Optional[str] = None):
+        super().__init__(name)
         self.selector = selector
         self.check_success_selector = check_success_selector
         self.check_failure_selector = check_failure_selector
 
-    def execute(self, driver: IWebDriver) -> None:
-        driver.click_element(self.selector)
-        if self.check_success_selector and not driver.is_element_present(self.check_success_selector):
-            if self.check_failure_selector and driver.is_element_present(self.check_failure_selector):
-                raise LoginFailedError("Login failed due to presence of failure element.")
-            raise LoginFailedError("Login failed due to absence of success element.")
+    def validate(self) -> bool:
+        return bool(self.selector)
+
+    def execute(self, driver: IWebDriver) -> ActionResult:
+        try:
+            driver.click_element(self.selector)
+
+            # Check for success/failure indicators if specified
+            if self.check_success_selector and not driver.is_element_present(self.check_success_selector):
+                if self.check_failure_selector and driver.is_element_present(self.check_failure_selector):
+                    return ActionResult.failure("Login failed due to presence of failure element.")
+                return ActionResult.failure("Login failed due to absence of success element.")
+
+            return ActionResult.success(f"Clicked element {self.selector}")
+        except Exception as e:
+            return ActionResult.failure(f"Failed to click element {self.selector}: {str(e)}")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "Click",
+            "name": self.name,
             "selector": self.selector,
             "check_success_selector": self.check_success_selector,
             "check_failure_selector": self.check_failure_selector,
         }
 
-class TypeAction(IAction):
-    def __init__(self, selector: str, value_type: str, value_key: str):
+class TypeAction(ActionBase):
+    def __init__(self, selector: str, value_type: str, value_key: str, name: str = "Type"):
+        super().__init__(name)
         self.selector = selector
         self.value_type = value_type
         self.value_key = value_key
 
-    def execute(self, driver: IWebDriver) -> None:
-        value = self._get_value()
-        driver.type_text(self.selector, value)
+    def validate(self) -> bool:
+        return bool(self.selector) and bool(self.value_type) and bool(self.value_key)
+
+    def execute(self, driver: IWebDriver) -> ActionResult:
+        try:
+            value = self._get_value()
+            driver.type_text(self.selector, value)
+            return ActionResult.success(f"Typed text into element {self.selector}")
+        except ValueError as e:
+            return ActionResult.failure(str(e))
+        except Exception as e:
+            return ActionResult.failure(f"Failed to type text into element {self.selector}: {str(e)}")
 
     def _get_value(self) -> str:
         if self.value_type == "credential":
@@ -53,35 +82,55 @@ class TypeAction(IAction):
                 for credential in credentials:
                     if credential["name"] == self.value_key.split(".")[0]:
                         return credential[self.value_key.split(".")[1]]
-        raise ValueError("Unsupported value type or key not found.")
+            raise ValueError(f"Credential not found: {self.value_key}")
+        elif self.value_type == "text":
+            return self.value_key
+        raise ValueError(f"Unsupported value type: {self.value_type}")
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "type": "Type",
+            "name": self.name,
             "selector": self.selector,
             "value_type": self.value_type,
             "value_key": self.value_key,
         }
 
-class WaitAction(IAction):
-    def __init__(self, duration_seconds: int):
+class WaitAction(ActionBase):
+    def __init__(self, duration_seconds: int, name: str = "Wait"):
+        super().__init__(name)
         self.duration_seconds = duration_seconds
 
-    def execute(self, driver: IWebDriver) -> None:
-        time.sleep(self.duration_seconds)
+    def validate(self) -> bool:
+        return self.duration_seconds > 0
+
+    def execute(self, driver: IWebDriver) -> ActionResult:
+        try:
+            time.sleep(self.duration_seconds)
+            return ActionResult.success(f"Waited for {self.duration_seconds} seconds")
+        except Exception as e:
+            return ActionResult.failure(f"Failed to wait: {str(e)}")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"type": "Wait", "duration_seconds": self.duration_seconds}
+        return {"type": "Wait", "name": self.name, "duration_seconds": self.duration_seconds}
 
-class ScreenshotAction(IAction):
-    def __init__(self, file_path: str):
+class ScreenshotAction(ActionBase):
+    def __init__(self, file_path: str, name: str = "Screenshot"):
+        super().__init__(name)
         self.file_path = file_path
 
-    def execute(self, driver: IWebDriver) -> None:
-        driver.take_screenshot(self.file_path)
+    def validate(self) -> bool:
+        return bool(self.file_path)
+
+    def execute(self, driver: IWebDriver) -> ActionResult:
+        try:
+            driver.take_screenshot(self.file_path)
+            return ActionResult.success(f"Took screenshot and saved to {self.file_path}")
+        except Exception as e:
+            return ActionResult.failure(f"Failed to take screenshot: {str(e)}")
 
     def to_dict(self) -> Dict[str, Any]:
-        return {"type": "Screenshot", "file_path": self.file_path}
+        return {"type": "Screenshot", "name": self.name, "file_path": self.file_path}
 
 class ActionFactory:
     _registry = {

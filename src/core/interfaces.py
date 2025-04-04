@@ -21,7 +21,7 @@ class IWebDriver(abc.ABC):
 
 class IAction(abc.ABC):
     @abc.abstractmethod
-    def execute(self, driver: IWebDriver) -> None: pass
+    def execute(self, driver: IWebDriver) -> Any: pass
     @abc.abstractmethod
     def to_dict(self) -> Dict[str, Any]: pass
 
