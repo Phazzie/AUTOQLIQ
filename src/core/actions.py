@@ -1,6 +1,8 @@
-from typing import Dict, Any, Optional
-from src.core.interfaces import IAction, IWebDriver
-from src.core.action_base import ActionBase, ActionResult
+from typing import Dict, Any, Optional, ClassVar
+from src.core.interfaces import IAction, IWebDriver, ICredentialRepository
+from src.core.action_base import ActionBase
+from src.core.action_result import ActionResult
+from src.core.exceptions import CredentialError
 import time
 import json
 
@@ -56,6 +58,14 @@ class ClickAction(ActionBase):
         }
 
 class TypeAction(ActionBase):
+    # Class variable to store credential repository
+    _credential_repository: ClassVar[Optional[ICredentialRepository]] = None
+
+    @classmethod
+    def set_credential_repository(cls, repository: ICredentialRepository) -> None:
+        """Set the credential repository for all TypeAction instances."""
+        cls._credential_repository = repository
+
     def __init__(self, selector: str, value_type: str, value_key: str, name: str = "Type"):
         super().__init__(name)
         self.selector = selector
@@ -72,17 +82,34 @@ class TypeAction(ActionBase):
             return ActionResult.success(f"Typed text into element {self.selector}")
         except ValueError as e:
             return ActionResult.failure(str(e))
+        except CredentialError as e:
+            return ActionResult.failure(str(e))
         except Exception as e:
             return ActionResult.failure(f"Failed to type text into element {self.selector}: {str(e)}")
 
     def _get_value(self) -> str:
         if self.value_type == "credential":
-            with open("credentials.json", "r") as file:
-                credentials = json.load(file)
-                for credential in credentials:
-                    if credential["name"] == self.value_key.split(".")[0]:
-                        return credential[self.value_key.split(".")[1]]
-            raise ValueError(f"Credential not found: {self.value_key}")
+            # Check if credential repository is set
+            if not self._credential_repository:
+                raise CredentialError("Credential repository not set. Call TypeAction.set_credential_repository() first.")
+
+            # Parse credential key (format: "credential_name.field")
+            parts = self.value_key.split(".")
+            if len(parts) != 2:
+                raise CredentialError(f"Invalid credential key format: {self.value_key}. Expected format: 'credential_name.field'")
+
+            credential_name, field = parts
+
+            # Get credential from repository
+            credential = self._credential_repository.get_by_name(credential_name)
+            if not credential:
+                raise CredentialError(f"Credential not found: {credential_name}", credential_name=credential_name)
+
+            # Get field from credential
+            if field not in credential:
+                raise CredentialError(f"Field '{field}' not found in credential '{credential_name}'", credential_name=credential_name)
+
+            return credential[field]
         elif self.value_type == "text":
             return self.value_key
         raise ValueError(f"Unsupported value type: {self.value_type}")

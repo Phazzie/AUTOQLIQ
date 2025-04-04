@@ -155,9 +155,11 @@ class TestIActionInterface(unittest.TestCase):
         """Test that IAction method signatures are correct."""
         # This test verifies that the method signatures match what we expect
 
-        # execute method should accept a driver and return Any
+        # execute method should accept a driver and return ActionResult
         self.assertEqual(IAction.execute.__annotations__['driver'], IWebDriver)
-        self.assertEqual(IAction.execute.__annotations__['return'], Any)
+        # Check that the return type is ActionResult
+        from src.core.action_result import ActionResult
+        self.assertEqual(IAction.execute.__annotations__['return'], ActionResult)
 
         # to_dict method should return a Dict[str, Any]
         self.assertEqual(IAction.to_dict.__annotations__['return'], Dict[str, Any])

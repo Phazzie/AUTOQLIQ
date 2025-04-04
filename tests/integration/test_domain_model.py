@@ -1,9 +1,7 @@
 import unittest
-import os
-import json
-from typing import Any
+from typing import Any, List, Dict, Optional
 
-from src.core.interfaces import IWebDriver
+from src.core.interfaces import IWebDriver, ICredentialRepository
 from src.core.workflow_entity import Workflow
 from src.core.credentials import Credential
 from src.core.actions import (
@@ -14,6 +12,24 @@ from src.core.actions import (
     ScreenshotAction,
     ActionFactory
 )
+
+
+class MockCredentialRepository(ICredentialRepository):
+    """Mock implementation of ICredentialRepository for testing."""
+
+    def __init__(self):
+        self.credentials = [
+            {"name": "test_login", "username": "user@example.com", "password": "password123"}
+        ]
+
+    def get_all(self) -> List[Dict[str, str]]:
+        return self.credentials
+
+    def get_by_name(self, name: str) -> Optional[Dict[str, str]]:
+        for credential in self.credentials:
+            if credential["name"] == name:
+                return credential
+        return None
 
 
 class MockWebDriver(IWebDriver):
@@ -61,34 +77,14 @@ class TestDomainModelIntegration(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.driver = MockWebDriver()
+        self.credential_repo = MockCredentialRepository()
 
-        # Create test credentials data
-        self.credentials_data = [
-            {"name": "test_login", "username": "user@example.com", "password": "password123"}
-        ]
-
-        # Save the original credentials file path
-        self.original_credentials_path = "credentials.json"
-
-        # Create a backup if the original file exists
-        if os.path.exists(self.original_credentials_path):
-            with open(self.original_credentials_path, "r") as f:
-                self.original_credentials_content = f.read()
-        else:
-            self.original_credentials_content = None
-
-        # Replace the original file with our test data
-        with open(self.original_credentials_path, "w") as f:
-            json.dump(self.credentials_data, f)
+        # Set the credential repository for TypeAction
+        TypeAction.set_credential_repository(self.credential_repo)
 
     def tearDown(self):
         """Tear down test fixtures."""
-        # Restore the original credentials file
-        if self.original_credentials_content is not None:
-            with open(self.original_credentials_path, "w") as f:
-                f.write(self.original_credentials_content)
-        elif os.path.exists(self.original_credentials_path):
-            os.remove(self.original_credentials_path)
+        # No teardown needed
 
     def test_credential_entity_integration(self):
         """Test that Credential entity can be created, serialized, and deserialized."""
@@ -150,8 +146,8 @@ class TestDomainModelIntegration(unittest.TestCase):
         # Create workflow
         workflow = Workflow(name="login_workflow", actions=actions)
 
-        # Execute workflow
-        results = workflow.execute(self.driver)
+        # Execute workflow with credential repository
+        results = workflow.execute(self.driver, self.credential_repo)
 
         # Verify results
         self.assertEqual(len(results), 6)
@@ -216,9 +212,9 @@ class TestDomainModelIntegration(unittest.TestCase):
         self.assertEqual(workflow.name, deserialized.name)
         self.assertEqual(len(workflow.actions), len(deserialized.actions))
 
-        # Execute both workflows and compare results
-        original_results = workflow.execute(self.driver)
-        deserialized_results = deserialized.execute(self.driver)
+        # Execute both workflows with credential repository and compare results
+        original_results = workflow.execute(self.driver, self.credential_repo)
+        deserialized_results = deserialized.execute(self.driver, self.credential_repo)
 
         # Verify results
         self.assertEqual(len(original_results), len(deserialized_results))
