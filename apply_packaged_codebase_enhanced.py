@@ -129,11 +129,12 @@ def parse_packaged_codebase(file_path: str) -> Tuple[List[str], Dict[str, str], 
                 print(f"Parsing input file ({file_size/1024/1024:.1f} MB)...")
 
             # Process the file line by line
-            for i, line in enumerate(f):
+            line_count = 0
+            for line in f:
+                line_count += 1
                 # Show progress for large files
-                if file_size > 0 and i % 10000 == 0:
-                    position = f.tell()
-                    progress_pct = min(100, position / file_size * 100)
+                if file_size > 0 and line_count % 10000 == 0:
+                    progress_pct = min(100, line_count / (file_size / 100))  # Rough estimate
                     print(f"Parsing progress: {progress_pct:.1f}%\r", end="")
 
                 # Check for START marker

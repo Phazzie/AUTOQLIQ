@@ -1,263 +1,209 @@
+"""Custom exceptions for the AutoQliq application."""
+
 from typing import Optional
 
 
 class AutoQliqError(Exception):
-    """
-    Base exception for all AutoQliq-specific errors.
-
-    This serves as the parent class for all custom exceptions in the application,
-    providing a consistent way to handle errors and add context information.
-
-    Attributes:
-        message: The error message
-        cause: The original exception that caused this error, if any
-    """
+    """Base exception for all AutoQliq-specific errors."""
 
     def __init__(self, message: str, cause: Optional[Exception] = None):
-        """
-        Initialize an AutoQliqError.
-
-        Args:
-            message: The error message
-            cause: The original exception that caused this error, if any
-        """
         self.message = message
         self.cause = cause
         super().__init__(self._format_message())
 
     def _format_message(self) -> str:
-        """
-        Format the error message, including cause information if available.
+        if self.cause:
+            # Ensure cause message is included, especially for wrapped standard exceptions
+            cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+            return f"{self.message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return self.message
 
-        Returns:
-            The formatted error message
-        """
-        if self.cause is None:
-            return self.message
+    def __str__(self) -> str:
+        return self._format_message()
 
-        cause_str = f"{type(self.cause).__name__} - {str(self.cause)}"
-        return f"{self.message} (caused by: {cause_str})"
+    def __repr__(self) -> str:
+        cause_repr = f", cause={self.cause!r}" if self.cause else ""
+        return f"{self.__class__.__name__}(message={self.message!r}{cause_repr})"
+
+
+class ConfigError(AutoQliqError):
+    """Raised for configuration-related errors."""
+    pass
 
 
 class WorkflowError(AutoQliqError):
-    """
-    Raised when there is an error in workflow execution.
-
-    Attributes:
-        message: The error message
-        workflow_name: The name of the workflow that encountered the error
-        cause: The original exception that caused this error, if any
-    """
-
-    def __init__(self, message: str, workflow_name: Optional[str] = None, cause: Optional[Exception] = None):
-        """
-        Initialize a WorkflowError.
-
-        Args:
-            message: The error message
-            workflow_name: The name of the workflow that encountered the error
-            cause: The original exception that caused this error, if any
-        """
+    """Raised for errors during workflow definition or execution."""
+    def __init__(
+        self,
+        message: str,
+        workflow_name: Optional[str] = None,
+        action_name: Optional[str] = None,
+        action_type: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
         self.workflow_name = workflow_name
+        self.action_name = action_name
+        self.action_type = action_type
         super().__init__(message, cause)
 
     def _format_message(self) -> str:
-        """
-        Format the error message, including workflow name and cause information if available.
+        context = []
+        if self.workflow_name: context.append(f"workflow='{self.workflow_name}'")
+        if self.action_name: context.append(f"action='{self.action_name}'")
+        if self.action_type: context.append(f"type='{self.action_type}'")
+        context_str = f" ({', '.join(context)})" if context else ""
+        base_message = f"{self.message}{context_str}"
 
-        Returns:
-            The formatted error message
-        """
-        base_message = self.message
-
-        if self.workflow_name is not None:
-            base_message = f"{base_message} (workflow: {self.workflow_name})"
-
-        if self.cause is None:
-            return base_message
-
-        cause_str = f"{type(self.cause).__name__} - {str(self.cause)}"
-        return f"{base_message} (caused by: {cause_str})"
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message
 
 
 class ActionError(AutoQliqError):
-    """
-    Raised when there is an error in action execution.
-
-    Attributes:
-        message: The error message
-        action_name: The name of the action that encountered the error
-        cause: The original exception that caused this error, if any
-    """
-
-    def __init__(self, message: str, action_name: Optional[str] = None, cause: Optional[Exception] = None):
-        """
-        Initialize an ActionError.
-
-        Args:
-            message: The error message
-            action_name: The name of the action that encountered the error
-            cause: The original exception that caused this error, if any
-        """
+    """Raised for errors during the execution or configuration of a specific action."""
+    def __init__(
+        self,
+        message: str,
+        action_name: Optional[str] = None,
+        action_type: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
         self.action_name = action_name
+        self.action_type = action_type
         super().__init__(message, cause)
 
     def _format_message(self) -> str:
-        """
-        Format the error message, including action name and cause information if available.
+        context = []
+        if self.action_name: context.append(f"action='{self.action_name}'")
+        if self.action_type: context.append(f"type='{self.action_type}'")
+        context_str = f" ({', '.join(context)})" if context else ""
+        base_message = f"{self.message}{context_str}"
 
-        Returns:
-            The formatted error message
-        """
-        base_message = self.message
-
-        if self.action_name is not None:
-            base_message = f"{base_message} (action: {self.action_name})"
-
-        if self.cause is None:
-            return base_message
-
-        cause_str = f"{type(self.cause).__name__} - {str(self.cause)}"
-        return f"{base_message} (caused by: {cause_str})"
-
-
-class ValidationError(AutoQliqError):
-    """
-    Raised when validation fails for an entity or input.
-
-    Attributes:
-        message: The error message
-        field_name: The name of the field that failed validation
-        cause: The original exception that caused this error, if any
-    """
-
-    def __init__(self, message: str, field_name: Optional[str] = None, cause: Optional[Exception] = None):
-        """
-        Initialize a ValidationError.
-
-        Args:
-            message: The error message
-            field_name: The name of the field that failed validation
-            cause: The original exception that caused this error, if any
-        """
-        self.field_name = field_name
-        super().__init__(message, cause)
-
-    def _format_message(self) -> str:
-        """
-        Format the error message, including field name and cause information if available.
-
-        Returns:
-            The formatted error message
-        """
-        base_message = self.message
-
-        if self.field_name is not None:
-            base_message = f"{base_message} (field: {self.field_name})"
-
-        if self.cause is None:
-            return base_message
-
-        cause_str = f"{type(self.cause).__name__} - {str(self.cause)}"
-        return f"{base_message} (caused by: {cause_str})"
-
-
-class CredentialError(AutoQliqError):
-    """
-    Raised when there is an error related to credentials.
-
-    Attributes:
-        message: The error message
-        credential_name: The name of the credential that encountered the error
-        cause: The original exception that caused this error, if any
-    """
-
-    def __init__(self, message: str, credential_name: Optional[str] = None, cause: Optional[Exception] = None):
-        """
-        Initialize a CredentialError.
-
-        Args:
-            message: The error message
-            credential_name: The name of the credential that encountered the error
-            cause: The original exception that caused this error, if any
-        """
-        self.credential_name = credential_name
-        super().__init__(message, cause)
-
-    def _format_message(self) -> str:
-        """
-        Format the error message, including credential name and cause information if available.
-
-        Returns:
-            The formatted error message
-        """
-        base_message = self.message
-
-        if self.credential_name is not None:
-            base_message = f"{base_message} (credential: {self.credential_name})"
-
-        if self.cause is None:
-            return base_message
-
-        cause_str = f"{type(self.cause).__name__} - {str(self.cause)}"
-        return f"{base_message} (caused by: {cause_str})"
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message
 
 
 class WebDriverError(AutoQliqError):
-    """
-    Raised when there is an error related to the web driver.
-
-    Attributes:
-        message: The error message
-        driver_type: The type of web driver that encountered the error
-        cause: The original exception that caused this error, if any
-    """
-
-    def __init__(self, message: str, driver_type: Optional[str] = None, cause: Optional[Exception] = None):
-        """
-        Initialize a WebDriverError.
-
-        Args:
-            message: The error message
-            driver_type: The type of web driver that encountered the error
-            cause: The original exception that caused this error, if any
-        """
+    """Raised for errors related to WebDriver operations."""
+    def __init__(
+        self,
+        message: str,
+        driver_type: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
         self.driver_type = driver_type
         super().__init__(message, cause)
 
     def _format_message(self) -> str:
-        """
-        Format the error message, including driver type and cause information if available.
-
-        Returns:
-            The formatted error message
-        """
-        base_message = self.message
-
-        if self.driver_type is not None:
-            base_message = f"{base_message} (driver: {self.driver_type})"
-
-        if self.cause is None:
-            return base_message
-
-        cause_str = f"{type(self.cause).__name__} - {str(self.cause)}"
-        return f"{base_message} (caused by: {cause_str})"
+        context = f" (driver: {self.driver_type})" if self.driver_type else ""
+        base_message = f"{self.message}{context}"
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message
 
 
-# For backward compatibility
+class RepositoryError(AutoQliqError):
+    """Raised for errors related to repository operations (persistence)."""
+    def __init__(
+        self,
+        message: str,
+        repository_name: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
+        self.repository_name = repository_name
+        self.entity_id = entity_id
+        super().__init__(message, cause)
+
+    def _format_message(self) -> str:
+        context = []
+        if self.repository_name: context.append(f"repository='{self.repository_name}'")
+        if self.entity_id: context.append(f"id='{self.entity_id}'")
+        context_str = f" ({', '.join(context)})" if context else ""
+        base_message = f"{self.message}{context_str}"
+
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message
+
+
+class CredentialError(RepositoryError):
+    """Raised specifically for errors related to credential storage or retrieval."""
+    def __init__(
+        self,
+        message: str,
+        credential_name: Optional[str] = None, # Specific alias for entity_id
+        cause: Optional[Exception] = None
+    ):
+        super().__init__(
+            message,
+            repository_name="CredentialRepository",
+            entity_id=credential_name,
+            cause=cause
+        )
+        self.credential_name = credential_name # Keep specific attribute if needed
+
+
+class SerializationError(AutoQliqError):
+    """Raised for errors during serialization or deserialization."""
+    pass
+
+
+class ValidationError(AutoQliqError):
+    """Raised when data validation fails."""
+    def __init__(
+        self,
+        message: str,
+        field_name: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
+        self.field_name = field_name
+        super().__init__(message, cause)
+
+    def _format_message(self) -> str:
+        context = f" (field: {self.field_name})" if self.field_name else ""
+        base_message = f"{self.message}{context}"
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message
+
+
+class UIError(AutoQliqError):
+    """Raised for errors originating from the UI layer."""
+    def __init__(
+        self,
+        message: str,
+        component_name: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
+        self.component_name = component_name
+        super().__init__(message, cause)
+
+    def _format_message(self) -> str:
+        context = f" (component: {self.component_name})" if self.component_name else ""
+        base_message = f"{self.message}{context}"
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message
+
+
+# --- Deprecated / Compatibility ---
 class LoginFailedError(ActionError):
+    """Raised when login fails due to incorrect credentials or other issues.
+    Deprecated: Prefer raising ActionError or WorkflowError with appropriate context.
     """
-    Raised when login fails due to incorrect credentials or other issues.
-
-    This is a specialized ActionError for login failures.
-    """
-
     def __init__(self, message: str, cause: Optional[Exception] = None):
-        """
-        Initialize a LoginFailedError.
-
-        Args:
-            message: The error message
-            cause: The original exception that caused this error, if any
-        """
         super().__init__(message, action_name="Login", cause=cause)

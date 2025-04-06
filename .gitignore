@@ -1,0 +1,43 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE files
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Database files
+*.db
+
+# Temporary files
+temp/
+test_apply/
+test_apply_enhanced/
+test_package/
+
+# Packaging output
+*.txt
+!requirements.txt
+
+# Backup files
+*_backup/
+script_backups_*/
+archived_packages/
+
+# Test output
+.coverage
+htmlcov/
