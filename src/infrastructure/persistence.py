@@ -1,8 +1,9 @@
 import json
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from src.core.interfaces import ICredentialRepository, IWorkflowRepository, IAction
 from src.core.credentials import Credential
+from src.core.actions import ActionFactory
 
 class FileSystemCredentialRepository(ICredentialRepository):
     def __init__(self, file_path: str):
@@ -38,5 +39,4 @@ class FileSystemWorkflowRepository(IWorkflowRepository):
         return [f.split('.')[0] for f in os.listdir(self.directory_path) if f.endswith('.json')]
 
     def _create_action(self, action_data: Dict[str, Any]) -> IAction:
-        # Placeholder for action creation logic
-        pass
+        return ActionFactory.create_action(action_data)

@@ -1,6 +1,8 @@
 import abc
 from typing import Any, List, Dict, Optional
 
+from src.core.action_result import ActionResult
+
 class IWebDriver(abc.ABC):
     @abc.abstractmethod
     def get(self, url: str) -> None: pass
@@ -21,7 +23,7 @@ class IWebDriver(abc.ABC):
 
 class IAction(abc.ABC):
     @abc.abstractmethod
-    def execute(self, driver: IWebDriver) -> None: pass
+    def execute(self, driver: IWebDriver) -> ActionResult: pass
     @abc.abstractmethod
     def to_dict(self) -> Dict[str, Any]: pass
 
