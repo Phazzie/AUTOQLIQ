@@ -1,0 +1,21 @@
+# Directories to exclude
+archived/
+test_dir/
+script_backups_20250406_001502/
+.devcontainer/
+.github/
+.vscode/
+.venv/
+
+# Generated files
+code_quality_scripts_*.txt
+*.log
+test.db
+
+# Backup and temporary files
+*_refactored*.py
+*_v*.py
+
+# Specific files to exclude
+repomix-output.xml
+GEMINI.txt
