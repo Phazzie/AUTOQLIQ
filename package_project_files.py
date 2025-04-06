@@ -110,7 +110,7 @@ def find_source_files(
     root_dir: str,
     exclude_dirs: List[str] = DEFAULT_EXCLUDE_DIRS,
     exclude_patterns: List[str] = DEFAULT_EXCLUDE_PATTERNS,
-) -> Tuple[List[str], List[str]]:
+) -> Tuple[List[str], List[Tuple[str, str]]]:
     """
     Find all source code files and important project files, excluding dependencies and non-essential files.
 
@@ -158,19 +158,28 @@ def find_source_files(
         logger.error(f"Source directory not found: {src_dir}")
     else:
         for dirpath, dirnames, filenames in os.walk(src_dir):
-            # Skip excluded directories
-            dirnames[:] = [d for d in dirnames if d not in exclude_dirs and
-                          not any(fnmatch.fnmatch(d, pattern) for pattern in exclude_dirs if '*' in pattern)]
+            # Track excluded directories
+            excluded_dirs = []
+            for d in list(dirnames):
+                if d in exclude_dirs or any(fnmatch.fnmatch(d, pattern) for pattern in exclude_dirs if '*' in pattern):
+                    excluded_dirs.append(d)
+                    dirnames.remove(d)
+
+            # Log excluded directories
+            for d in excluded_dirs:
+                dir_path = os.path.relpath(os.path.join(dirpath, d), root_dir)
+                skipped_files.append((dir_path, "Excluded directory"))
 
             # Process files
             for filename in filenames:
-                # Skip files matching exclude patterns
-                if matches_pattern(filename, exclude_patterns):
-                    continue
-
                 # Get the full path and relative path
                 full_path = os.path.join(dirpath, filename)
                 rel_path = os.path.relpath(full_path, root_dir)
+
+                # Skip files matching exclude patterns
+                if matches_pattern(filename, exclude_patterns):
+                    skipped_files.append((rel_path, "Matches exclude pattern"))
+                    continue
 
                 # Skip if any part of the path is in exclude_dirs
                 if is_excluded_path(rel_path, exclude_dirs):
@@ -188,19 +197,28 @@ def find_source_files(
     docs_dir = os.path.join(root_dir, 'docs')
     if os.path.exists(docs_dir):
         for dirpath, dirnames, filenames in os.walk(docs_dir):
-            # Skip excluded directories
-            dirnames[:] = [d for d in dirnames if d not in exclude_dirs and
-                          not any(fnmatch.fnmatch(d, pattern) for pattern in exclude_dirs if '*' in pattern)]
+            # Track excluded directories
+            excluded_dirs = []
+            for d in list(dirnames):
+                if d in exclude_dirs or any(fnmatch.fnmatch(d, pattern) for pattern in exclude_dirs if '*' in pattern):
+                    excluded_dirs.append(d)
+                    dirnames.remove(d)
+
+            # Log excluded directories
+            for d in excluded_dirs:
+                dir_path = os.path.relpath(os.path.join(dirpath, d), root_dir)
+                skipped_files.append((dir_path, "Excluded directory"))
 
             # Process files
             for filename in filenames:
-                # Skip files matching exclude patterns
-                if matches_pattern(filename, exclude_patterns):
-                    continue
-
                 # Get the full path and relative path
                 full_path = os.path.join(dirpath, filename)
                 rel_path = os.path.relpath(full_path, root_dir)
+
+                # Skip files matching exclude patterns
+                if matches_pattern(filename, exclude_patterns):
+                    skipped_files.append((rel_path, "Matches exclude pattern"))
+                    continue
 
                 # Skip if any part of the path is in exclude_dirs
                 if is_excluded_path(rel_path, exclude_dirs):
@@ -394,6 +412,23 @@ def main():
             print(f"  {file_path}: {error}")
         if len(failed_files) > 10:
             print(f"  ... and {len(failed_files) - 10} more")
+
+    if skipped_files:
+        print("\nSkipped files (not included in package):")
+        # Group skipped files by reason
+        reasons = {}
+        for file_path, reason in skipped_files:
+            if reason not in reasons:
+                reasons[reason] = []
+            reasons[reason].append(file_path)
+
+        # Print skipped files by reason
+        for reason, files in reasons.items():
+            print(f"\n  Reason: {reason}")
+            for file_path in files[:5]:  # Show only first 5 for each reason
+                print(f"    {file_path}")
+            if len(files) > 5:
+                print(f"    ... and {len(files) - 5} more")
 
     logger.info(f"Processing complete. Found: {len(source_files)}, Processed: {processed_count}, "
                 f"Failed: {len(failed_files)}, Skipped: {len(skipped_files)}")
