@@ -23,13 +23,55 @@ The output format uses markers like this:
 
 Usage:
     python package_codebase.py [options]
+
+--------------------------------------------------------------------------------
+# PROJECT OVERVIEW FOR AI ANALYSIS
+--------------------------------------------------------------------------------
+
+## 1. Project Structure Overview
+
+AutoQliq follows a layered architecture with clear separation of concerns:
+
+- Core Layer: Domain model, interfaces, actions, workflow logic
+- Infrastructure Layer: WebDrivers, persistence, repositories
+- Application Layer: Services, application-level interfaces
+- UI Layer: Views, presenters, components
+- Testing: Unit tests, integration tests, end-to-end tests
+
+## 2. Current Implementation Status
+
+- Phase 1 (Completed): Core Domain Model with entities, interfaces, actions
+- Phase 2 (In Progress): Infrastructure layer, UI components, presenters
+- Not Started: Advanced security, performance optimizations, comprehensive docs
+
+## 3. Key Gaps and Missing Components
+
+- Infrastructure Layer: Need to complete repository and WebDriver implementations
+- UI Layer: Need to refactor components and implement presenters
+- Testing: Need integration tests and end-to-end tests
+- Documentation: Need API docs, architecture docs, user guides
+- Tooling: Need build/deployment processes, CI/CD pipeline
+
+## 4. Priority Areas for Immediate Focus
+
+- Complete Repository Implementations
+- Refactor UI Components for better separation of concerns
+- Implement Presenters for workflow editing and execution
+- Add Integration Tests for component interactions
+- Improve Documentation for completed components
+
+## 5. Development Principles
+
+- TDD: Red-Green-Refactor cycle, tests before implementation, >90% coverage
+- SOLID: Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion
+- KISS: Simple solutions, no premature optimization, methods ≤20 lines
+- DRY: No duplicated code, shared functionality in utilities, single source of truth
 """
 
 import os
-import sys
 import argparse
 from pathlib import Path
-from typing import List, Set, Tuple, Dict
+from typing import List, Tuple
 import fnmatch
 import datetime
 import logging
@@ -235,6 +277,53 @@ def generate_output_file(
     failed_files = []
 
     with open(output_file, 'w', encoding='utf-8') as f:
+        # Write header with project information
+        f.write("################################################################################\n")
+        f.write("# AUTOQLIQ PROJECT CODEBASE PACKAGE\n")
+        f.write("# Generated on: " + datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
+        f.write("################################################################################\n\n")
+
+        # Write project overview
+        f.write("# PROJECT OVERVIEW FOR AI ANALYSIS\n\n")
+
+        f.write("## 1. Project Structure Overview\n\n")
+        f.write("AutoQliq follows a layered architecture with clear separation of concerns:\n\n")
+        f.write("- Core Layer: Domain model, interfaces, actions, workflow logic\n")
+        f.write("- Infrastructure Layer: WebDrivers, persistence, repositories\n")
+        f.write("- Application Layer: Services, application-level interfaces\n")
+        f.write("- UI Layer: Views, presenters, components\n")
+        f.write("- Testing: Unit tests, integration tests, end-to-end tests\n\n")
+
+        f.write("## 2. Current Implementation Status\n\n")
+        f.write("- Phase 1 (Completed): Core Domain Model with entities, interfaces, actions\n")
+        f.write("- Phase 2 (In Progress): Infrastructure layer, UI components, presenters\n")
+        f.write("- Not Started: Advanced security, performance optimizations, comprehensive docs\n\n")
+
+        f.write("## 3. Key Gaps and Missing Components\n\n")
+        f.write("- Infrastructure Layer: Need to complete repository and WebDriver implementations\n")
+        f.write("- UI Layer: Need to refactor components and implement presenters\n")
+        f.write("- Testing: Need integration tests and end-to-end tests\n")
+        f.write("- Documentation: Need API docs, architecture docs, user guides\n")
+        f.write("- Tooling: Need build/deployment processes, CI/CD pipeline\n\n")
+
+        f.write("## 4. Priority Areas for Immediate Focus\n\n")
+        f.write("- Complete Repository Implementations\n")
+        f.write("- Refactor UI Components for better separation of concerns\n")
+        f.write("- Implement Presenters for workflow editing and execution\n")
+        f.write("- Add Integration Tests for component interactions\n")
+        f.write("- Improve Documentation for completed components\n\n")
+
+        f.write("## 5. Development Principles\n\n")
+        f.write("- TDD: Red-Green-Refactor cycle, tests before implementation, >90% coverage\n")
+        f.write("- SOLID: Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion\n")
+        f.write("- KISS: Simple solutions, no premature optimization, methods ≤20 lines\n")
+        f.write("- DRY: No duplicated code, shared functionality in utilities, single source of truth\n\n")
+
+        f.write("################################################################################\n")
+        f.write("# FILE CONTENTS\n")
+        f.write("################################################################################\n\n")
+
+        # Process each file
         for file_path in file_paths:
             full_path = os.path.join(root_dir, file_path)
             try:
