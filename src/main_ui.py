@@ -5,29 +5,38 @@ import os
 
 # Core components (interfaces needed for type hinting)
 from src.core.interfaces import IWorkflowRepository, ICredentialRepository
+from src.core.interfaces.service import IWorkflowService, ICredentialService, IWebDriverService
 
 # Infrastructure components
 from src.infrastructure.repositories import RepositoryFactory
-from src.infrastructure.webdrivers import WebDriverFactory # Keep factory import
+from src.infrastructure.webdrivers import WebDriverFactory
+
+# Application services
+from src.application.services.credential_service import CredentialService
+from src.application.services.workflow_service import WorkflowService
+from src.application.services.webdriver_service import WebDriverService
 
 # UI components
-from src.ui.views.workflow_editor_view_refactored import WorkflowEditorView
-from src.ui.views.workflow_runner_view_refactored import WorkflowRunnerView
-from src.ui.presenters.workflow_editor_presenter_refactored import WorkflowEditorPresenter
-from src.ui.presenters.workflow_runner_presenter_refactored import WorkflowRunnerPresenter
+from src.ui.views.workflow_editor_view import WorkflowEditorView
+from src.ui.views.workflow_runner_view import WorkflowRunnerView
+from src.ui.presenters.workflow_editor_presenter import WorkflowEditorPresenter
+from src.ui.presenters.workflow_runner_presenter import WorkflowRunnerPresenter
 
 # Common utilities
-from src.infrastructure.common.logger_factory import LoggerFactory # For basic config
+from src.infrastructure.common.logger_factory import LoggerFactory
 
-# --- Configuration ---
-# TODO: Move these to a dedicated configuration file/module
-LOG_LEVEL = logging.DEBUG
-LOG_FILE = "autoqliq_app.log"
-REPOSITORY_TYPE = "file_system" # Options: "file_system", "database"
-CREDENTIALS_PATH = "credentials.json" # Path for file system or database file
-WORKFLOWS_PATH = "workflows" # Path for file system directory or database file
-WINDOW_TITLE = "AutoQliq v0.1"
-WINDOW_GEOMETRY = "900x650"
+# Configuration
+from src.config import Config
+
+# Load configuration from config.ini
+config = Config()
+LOG_LEVEL = getattr(logging, config.get('logging', 'level', 'DEBUG'))
+LOG_FILE = config.get('logging', 'file', 'autoqliq_app.log')
+REPOSITORY_TYPE = config.get('repositories', 'type', 'file_system')
+CREDENTIALS_PATH = config.get('repositories', 'credentials_path', 'credentials.json')
+WORKFLOWS_PATH = config.get('repositories', 'workflows_path', 'workflows')
+WINDOW_TITLE = config.get('ui', 'window_title', 'AutoQliq v0.1')
+WINDOW_GEOMETRY = config.get('ui', 'window_geometry', '900x650')
 
 
 def setup_logging():
@@ -85,9 +94,22 @@ def main():
         )
         logger.info("Repositories initialized.")
 
-        # Create Presenters, injecting dependencies
-        editor_presenter = WorkflowEditorPresenter(workflow_repo)
-        runner_presenter = WorkflowRunnerPresenter(workflow_repo, credential_repo, webdriver_factory)
+        # Create application services
+        credential_service = CredentialService(credential_repo)
+        workflow_service = WorkflowService(workflow_repo)
+        webdriver_service = WebDriverService(webdriver_factory)
+        logger.info("Application services initialized.")
+
+        # Create Presenters, injecting service dependencies
+        editor_presenter = WorkflowEditorPresenter(
+            workflow_service=workflow_service,
+            credential_service=credential_service
+        )
+        runner_presenter = WorkflowRunnerPresenter(
+            workflow_service=workflow_service,
+            credential_service=credential_service,
+            webdriver_service=webdriver_service
+        )
         logger.info("Presenters initialized.")
 
     except Exception as e:

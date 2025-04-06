@@ -1,8 +1,8 @@
-# AUTOCLICK Application
+# AutoQliq
 
 ## Overview
 
-AUTOCLICK is a Python-based desktop application designed to automate web tasks using Selenium and Tkinter. The application follows SOLID, DRY, and YAGNI principles to ensure a robust and maintainable codebase. The core functionality is driven by external JSON configuration files for workflows and credentials.
+AutoQliq is a Python-based desktop application designed to automate web tasks using Selenium/Playwright and Tkinter. The application follows SOLID, DRY, KISS, and TDD principles to ensure a robust and maintainable codebase. The core functionality is driven by external JSON configuration files for workflows and credentials, with support for both file system and database storage.
 
 ## Project Structure
 
@@ -57,6 +57,7 @@ AUTOCLICK/
 ## Installation
 
 1. Clone the repository:
+
    ```sh
    git clone https://github.com/githubnext/workspace-blank.git
    cd workspace-blank
@@ -70,31 +71,80 @@ AUTOCLICK/
 ## Usage
 
 1. Prepare your `credentials.json` file in the root directory with the following format:
+
    ```json
    [
-     { "name": "example_login", "username": "user@example.com", "password": "password123" }
+     {
+       "name": "example_login",
+       "username": "user@example.com",
+       "password": "password123"
+     }
    ]
    ```
 
 2. Create your workflow JSON files in the `workflows/` directory. Example:
+
    ```json
    [
      { "type": "Navigate", "url": "https://login.example.com" },
-     { "type": "Type", "selector": "#username-input", "value_type": "credential", "value_key": "example_login.username" },
-     { "type": "Click", "selector": "#login-button", "check_success_selector": "#dashboard-title", "check_failure_selector": "#login-error-message" },
+     {
+       "type": "Type",
+       "selector": "#username-input",
+       "value_type": "credential",
+       "value_key": "example_login.username"
+     },
+     {
+       "type": "Click",
+       "selector": "#login-button",
+       "check_success_selector": "#dashboard-title",
+       "check_failure_selector": "#login-error-message"
+     },
      { "type": "Wait", "duration_seconds": 3 },
      { "type": "Screenshot", "file_path": "report_screenshot.png" }
    ]
    ```
 
-3. Run the application:
+3. Configure the application by editing `config.ini` (see Configuration section below)
+
+4. Run the application:
    ```sh
    python src/main_ui.py
    ```
 
+## Configuration
+
+AutoQliq uses a configuration file (`config.ini`) to manage settings. Key configuration options include:
+
+- Repository type (file_system or database)
+- File paths for credentials and workflows
+- Logging settings
+- UI preferences
+
+Example configuration:
+
+```ini
+[repositories]
+type = file_system
+credentials_path = credentials.json
+workflows_path = workflows
+
+[logging]
+level = INFO
+file = autoqliq_app.log
+
+[ui]
+window_title = AutoQliq v0.1
+window_geometry = 900x650
+```
+
+## Security
+
+AutoQliq uses password hashing (via werkzeug.security) to securely store credentials. Passwords are never stored in plain text.
+
 ## Testing
 
 1. Run unit tests:
+
    ```sh
    pytest tests/unit
    ```
