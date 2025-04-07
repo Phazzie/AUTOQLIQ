@@ -4,10 +4,9 @@ This module defines the interface for action implementations that provide
 workflow step capabilities.
 """
 import abc
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 # Assuming ActionResult and IWebDriver are defined elsewhere
-# (Adjust import paths if necessary)
 from src.core.action_result import ActionResult
 from src.core.interfaces.webdriver import IWebDriver
 from src.core.interfaces.repository import ICredentialRepository
@@ -18,14 +17,12 @@ from src.core.interfaces.repository import ICredentialRepository
 class IAction(abc.ABC):
     """Interface for action implementations.
 
-    This interface defines the contract for actions that can be executed as part
-    of a workflow. Actions represent discrete steps in a browser automation workflow,
-    such as navigating to a URL, clicking a button, or typing text.
+    Defines the contract for executable steps within a workflow.
 
     Attributes:
-        name (str): A descriptive name for the action instance.
-        action_type (str): The type name of the action (e.g., "Navigate").
-                           Should be defined as a class attribute in implementations.
+        name (str): A user-defined name for this specific action instance.
+        action_type (str): The identifier for the action type (e.g., "Navigate", "Loop").
+                           Must be defined as a class attribute in implementations.
     """
     name: str
     action_type: str
@@ -34,47 +31,55 @@ class IAction(abc.ABC):
     def execute(
         self,
         driver: IWebDriver,
-        credential_repo: Optional[ICredentialRepository] = None
+        credential_repo: Optional[ICredentialRepository] = None,
+        context: Optional[Dict[str, Any]] = None # Context added
     ) -> ActionResult:
-        """Execute the action using the provided web driver.
+        """Execute the action using the provided web driver and context.
 
         Args:
-            driver: The web driver to use for execution.
-            credential_repo: Optional credential repository needed by some actions.
+            driver: The web driver instance.
+            credential_repo: Optional credential repository.
+            context: Optional dictionary holding execution context (e.g., loop variables).
 
         Returns:
             An ActionResult indicating success or failure.
 
         Raises:
-            ActionError: If a configuration or execution error specific to the action occurs.
-                         WebDriver exceptions should be caught and wrapped or handled internally.
-            CredentialError: If credential access fails (if applicable).
+            ActionError: For action-specific execution failures.
+            CredentialError: For credential-related failures.
+            WebDriverError: For driver-related failures.
+            ValidationError: If context needed is missing/invalid.
         """
         pass
 
     @abc.abstractmethod
     def to_dict(self) -> Dict[str, Any]:
-        """Convert the action to a dictionary representation.
+        """Serialize the action to a dictionary representation.
 
-        This dictionary should be serializable (e.g., to JSON) and contain
-        all necessary information to reconstruct the action later using a factory.
-        Must include a 'type' key matching the `action_type` attribute.
+        Must include 'type' and 'name' keys, plus action-specific parameters.
+        Nested actions (like in Loop or Conditional) should also be serialized.
 
         Returns:
-            A dictionary containing the action's type and parameters.
+            A dictionary representation of the action.
         """
         pass
 
     @abc.abstractmethod
     def validate(self) -> bool:
-        """Validate the action's configuration.
+        """Validate the action's configuration parameters.
 
-        Checks if the action has all necessary parameters set correctly.
+        Checks if required parameters are present and have valid types/formats.
+        Should also validate nested actions if applicable (e.g., Loop, Conditional).
 
         Returns:
-            True if the action is configured correctly, False otherwise.
+            True if the action is configured correctly.
 
         Raises:
-            ValidationError: If validation fails (optional, can also return False).
+            ValidationError: If validation fails (recommended approach).
         """
         pass
+
+    # Optional: Method to get nested actions, useful for editors/validation
+    def get_nested_actions(self) -> List['IAction']:
+        """Return any nested actions contained within this action."""
+        return [] # Default implementation for actions that don't contain others

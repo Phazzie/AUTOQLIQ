@@ -1,16 +1,17 @@
 """Database credential repository implementation for AutoQliq."""
-import json
 import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-# Core interfaces, exceptions, and common utilities
-from src.core.interfaces.repository import ICredentialRepository
+# Core dependencies
+from src.core.interfaces import ICredentialRepository # Correct interface import
 from src.core.exceptions import CredentialError, RepositoryError, ValidationError
+
+# Infrastructure dependencies
 from src.infrastructure.common.error_handling import handle_exceptions
 from src.infrastructure.common.logging_utils import log_method_call
-from src.infrastructure.common.validators import CredentialValidator
-from src.infrastructure.repositories.base.database_repository import DatabaseRepository
+from src.infrastructure.common.validators import CredentialValidator # Use common validator
+from src.infrastructure.repositories.base.database_repository import DatabaseRepository # Correct base class import
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +19,8 @@ class DatabaseCredentialRepository(DatabaseRepository[Dict[str, str]], ICredenti
     """
     Implementation of ICredentialRepository storing credentials in an SQLite database.
 
-    Manages CRUD operations for credentials. Passwords are stored as plain text
-    currently and require hashing/encryption for production use.
+    Manages CRUD operations for credentials. Assumes passwords provided to `save`
+    are already appropriately hashed/encrypted by the calling service layer.
 
     Attributes:
         db_path (str): Path to the SQLite database file.
@@ -34,11 +35,10 @@ class DatabaseCredentialRepository(DatabaseRepository[Dict[str, str]], ICredenti
 
         Args:
             db_path (str): Path to the SQLite database file.
-            **options (Any): Additional options (currently unused but kept for signature consistency).
+            **options (Any): Additional options (currently unused).
         """
-        # Pass db_path, table name, and logger name to the base class
         super().__init__(db_path=db_path, table_name=self._TABLE_NAME, logger_name=__name__)
-        # Base class constructor calls _create_table_if_not_exists -> _get_table_creation_sql
+        # Base constructor calls _create_table_if_not_exists
 
     def _get_primary_key_col(self) -> str:
         """Return the primary key column name for this repository."""
@@ -46,7 +46,7 @@ class DatabaseCredentialRepository(DatabaseRepository[Dict[str, str]], ICredenti
 
     def _get_table_creation_sql(self) -> str:
         """Return the SQL for creating the credentials table columns."""
-        # Using TEXT for password, assuming it will be hashed/encrypted later
+        # Storing password hash/value as TEXT
         return f"""
             {self._PK_COLUMN} TEXT PRIMARY KEY NOT NULL,
             username TEXT NOT NULL,
@@ -57,75 +57,68 @@ class DatabaseCredentialRepository(DatabaseRepository[Dict[str, str]], ICredenti
 
     def _map_row_to_entity(self, row: Dict[str, Any]) -> Dict[str, str]:
         """Convert a database row to a credential dictionary."""
-        # Ensure all expected columns are present
         name = row.get(self._PK_COLUMN)
         username = row.get("username")
-        password = row.get("password") # Retrieve stored password
+        password_stored = row.get("password")
 
-        if name is None or username is None or password is None:
+        if name is None or username is None or password_stored is None:
             missing = [col for col in [self._PK_COLUMN, "username", "password"] if row.get(col) is None]
-            raise RepositoryError(f"Database row is missing expected columns: {missing}", entity_id=name or "<unknown>")
+            raise RepositoryError(f"DB row missing expected columns: {missing}", entity_id=name or "<unknown>")
 
         return {
             "name": str(name),
             "username": str(username),
-            "password": str(password)
-            # We don't typically return created_at/modified_at in the entity dict
+            "password": str(password_stored) # Return the stored hash/value
         }
 
     def _map_entity_to_params(self, entity_id: str, entity: Dict[str, str]) -> Dict[str, Any]:
-        """Convert a credential dictionary to database parameters, including timestamps."""
-        # Validate before mapping (raises CredentialError/ValidationError if invalid)
+        """Convert credential dictionary (expecting prepared password) to DB parameters."""
+        # Validate structure first (raises CredentialError)
         CredentialValidator.validate_credential_data(entity)
-        # Ensure entity_id matches the name in the dictionary
         if entity_id != entity.get("name"):
-            raise ValidationError(f"Entity ID '{entity_id}' does not match name '{entity.get('name')}' in credential data.")
+            raise ValidationError(f"Entity ID '{entity_id}' != name '{entity.get('name')}' in data.")
+
+        password_to_store = entity["password"] # Assume this is ready for storage (e.g., hash)
 
         now = datetime.now().isoformat()
-        # WARNING: Storing password directly! Needs hashing/encryption in production.
-        # password_to_store = hash_password(entity["password"]) # Replace with actual hashing
-        password_to_store = entity["password"]
-        logger.warning(f"Storing credential '{entity_id}' password in plain text. Implement hashing.")
-
         return {
             self._PK_COLUMN: entity["name"],
             "username": entity["username"],
             "password": password_to_store,
-            "created_at": now, # Base class UPSERT ignores this on conflict
-            "modified_at": now # Base class UPSERT uses this
+            "created_at": now,
+            "modified_at": now
         }
 
-    # --- ICredentialRepository Method Implementations ---
+    # --- ICredentialRepository Implementation ---
 
     @log_method_call(logger)
-    @handle_exceptions(CredentialError, "Error saving credential", reraise_types=(CredentialError, RepositoryError, ValidationError))
+    @handle_exceptions(CredentialError, "Error saving credential", reraise_types=(CredentialError, ValidationError, RepositoryError))
     def save(self, credential: Dict[str, str]) -> None:
-        """Save (create or update) a credential."""
-        # Validate first (also done in _map_entity_to_params, but good practice here too)
-        CredentialValidator.validate_credential_data(credential) # Raises CredentialError
-        credential_name = credential['name']
-        # Use the base class save method which handles UPSERT and logging
-        # _map_entity_to_params within base save will handle final validation and mapping
-        super().save(credential_name, credential)
+        """Save (create or update) a credential. Assumes password in dict is prepared."""
+        credential_name = credential.get('name')
+        if not credential_name:
+            raise ValidationError("Credential data must include a 'name'.")
+        # Name validation happens in base class save -> _validate_entity_id
+        # Data validation happens in _map_entity_to_params -> CredentialValidator
+        super().save(credential_name, credential) # Base handles UPSERT
 
     @log_method_call(logger)
-    @handle_exceptions(CredentialError, "Error retrieving credential", reraise_types=(CredentialError, RepositoryError, ValidationError))
+    @handle_exceptions(CredentialError, "Error retrieving credential", reraise_types=(CredentialError, ValidationError, RepositoryError))
     def get_by_name(self, name: str) -> Optional[Dict[str, str]]:
-        """Get a credential by its unique name."""
-        # Use the base class get method; it validates ID and handles RepositoryError
-        # _map_row_to_entity handles conversion
-        return super().get(name) # Raises ValidationError if name invalid
+        """Get credential details (including password hash) by name."""
+        # Base class get handles ID validation, DB query, and mapping
+        return super().get(name)
 
     @log_method_call(logger)
-    @handle_exceptions(CredentialError, "Error deleting credential", reraise_types=(CredentialError, RepositoryError, ValidationError))
+    @handle_exceptions(CredentialError, "Error deleting credential", reraise_types=(CredentialError, ValidationError, RepositoryError))
     def delete(self, name: str) -> bool:
-        """Delete a credential by its name."""
-        # Use the base class delete method; it validates ID and handles RepositoryError
-        return super().delete(name) # Raises ValidationError if name invalid
+        """Delete a credential by name."""
+        # Base class delete handles ID validation and DB deletion
+        return super().delete(name)
 
     @log_method_call(logger)
-    @handle_exceptions(CredentialError, "Error listing credentials", reraise_types=(CredentialError, RepositoryError))
+    @handle_exceptions(CredentialError, "Error listing credentials", reraise_types=(RepositoryError,))
     def list_credentials(self) -> List[str]:
         """List the names of all stored credentials."""
-        # Use the base class list method; it handles RepositoryError
+        # Base class list handles DB query for primary key column
         return super().list()

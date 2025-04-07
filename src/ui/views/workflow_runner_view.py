@@ -1,302 +1,253 @@
-"""Workflow runner view module for AutoQliq.
-
-This module provides the view component for the workflow runner.
-"""
+"""Workflow runner view implementation for AutoQliq."""
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, scrolledtext, messagebox
 import logging
-from typing import Dict, Any, Optional, List
-from unittest.mock import MagicMock, Mock
+from typing import List, Optional, Dict, Any
+from datetime import datetime
 
+# Core / Infrastructure
 from src.core.exceptions import UIError
 
+# UI elements
+from src.ui.interfaces.presenter import IWorkflowRunnerPresenter
+from src.ui.interfaces.view import IWorkflowRunnerView
+from src.ui.views.base_view import BaseView
+from src.ui.common.ui_factory import UIFactory
+# Import StatusBar if used by BaseView or directly
+# from src.ui.common.status_bar import StatusBar
 
-class WorkflowRunnerView:
+class WorkflowRunnerView(BaseView, IWorkflowRunnerView):
     """
-    View component for the workflow runner.
-
-    This class provides the UI for running workflows.
-    It communicates with a presenter to handle business logic.
-
-    Attributes:
-        root: The root Tkinter window
-        presenter: The presenter that handles business logic
-        main_frame: The main frame containing all widgets
-        workflow_listbox: Listbox displaying available workflows
-        credential_combobox: Combobox for selecting credentials
-        run_button: Button for running the selected workflow
-        stop_button: Button for stopping the running workflow
-        log_text: Text widget for displaying log messages
-        logger: Logger for recording view operations and errors
+    View component for the workflow runner. Displays workflows and credentials,
+    allows starting/stopping execution, and shows logs. Forwards user interactions
+    to the WorkflowRunnerPresenter.
     """
 
-    def __init__(self, root: tk.Tk, presenter: Any):
+    def __init__(self, root: tk.Widget, presenter: IWorkflowRunnerPresenter):
         """
-        Initialize a new WorkflowRunnerView.
+        Initialize the workflow runner view.
 
         Args:
-            root: The root Tkinter window
-            presenter: The presenter that handles business logic
-
-        Raises:
-            UIError: If the view cannot be initialized
+            root: The parent widget (e.g., a frame in a notebook).
+            presenter: The presenter handling the logic for this view.
         """
-        self.root = root
-        self.presenter = presenter
-        self.logger = logging.getLogger(__name__)
+        # Note: BaseView.__init__ creates self.main_frame and finds status_bar
+        super().__init__(root, presenter)
+        self.presenter: IWorkflowRunnerPresenter # Type hint
 
-        # Initialize attributes for testing
-        self.workflow_listbox = None
-        self.credential_combobox = None
-        self.run_button = None
-        self.stop_button = None
-        self.log_text = None
+        # Widgets specific to this view
+        self.workflow_list_widget: Optional[tk.Listbox] = None
+        self.credential_combobox: Optional[ttk.Combobox] = None
+        self.credential_var: Optional[tk.StringVar] = None
+        self.run_button: Optional[ttk.Button] = None
+        self.stop_button: Optional[ttk.Button] = None
+        self.log_text_widget: Optional[tk.Text] = None
 
-        # For testing purposes, we'll skip the actual UI creation if we're in a test environment
-        if hasattr(self.root, 'children') and not isinstance(self.root, Mock) and not isinstance(self.root.children, MagicMock):
-            try:
-                # Create the main frame
-                self.main_frame = ttk.Frame(self.root, padding="10")
-                self.main_frame.pack(fill=tk.BOTH, expand=True)
+        try:
+            self._create_widgets()
+            self.logger.info("WorkflowRunnerView initialized successfully.")
+            # Initial population handled by presenter.initialize_view()
+        except Exception as e:
+            error_msg = "Failed to create WorkflowRunnerView widgets"
+            self.logger.exception(error_msg)
+            self.display_error("Initialization Error", f"{error_msg}: {e}")
+            raise UIError(error_msg, component_name="WorkflowRunnerView", cause=e) from e
 
-                # Create widgets
-                self.create_widgets()
+    def _create_widgets(self) -> None:
+        """Create the UI elements for the runner view within self.main_frame."""
+        self.logger.debug("Creating runner widgets.")
 
-                # Populate the workflow and credential lists
-                self.populate_workflow_list()
-                self.populate_credential_list()
+        # Configure grid weights for self.main_frame resizing
+        self.main_frame.rowconfigure(0, weight=1) # Top area
+        self.main_frame.rowconfigure(1, weight=3) # Log area below
+        self.main_frame.columnconfigure(0, weight=1, minsize=200) # Workflow list column
+        self.main_frame.columnconfigure(1, weight=3, minsize=400) # Controls + Log combined column
 
-                self.logger.debug("WorkflowRunnerView initialized")
-            except Exception as e:
-                error_msg = "Failed to initialize WorkflowRunnerView"
-                self.logger.error(error_msg, exc_info=True)
-                raise UIError(error_msg, component_name="WorkflowRunnerView", cause=e)
+        # --- Workflow List Section ---
+        wf_list_frame = UIFactory.create_label_frame(self.main_frame, text="Select Workflow")
+        wf_list_frame.grid(row=0, column=0, sticky=tk.NSEW, padx=(0, 5), pady=(0, 5))
+        wf_list_frame.rowconfigure(0, weight=1)
+        wf_list_frame.columnconfigure(0, weight=1)
+
+        wf_scrolled_list = UIFactory.create_scrolled_listbox(wf_list_frame, height=10, selectmode=tk.BROWSE)
+        self.workflow_list_widget = wf_scrolled_list["listbox"]
+        wf_scrolled_list["frame"].grid(row=0, column=0, sticky=tk.NSEW)
+        self.workflow_list_widget.bind("<<ListboxSelect>>", self._on_selection_change)
+
+        # --- Controls Section ---
+        control_frame = UIFactory.create_label_frame(self.main_frame, text="Controls")
+        control_frame.grid(row=1, column=0, sticky=tk.NSEW, padx=(0, 5), pady=(5, 0)) # Below workflow list
+
+        cred_label = UIFactory.create_label(control_frame, text="Credential:")
+        cred_label.pack(anchor=tk.W, padx=5, pady=(5, 0))
+
+        self.credential_var = tk.StringVar(self.main_frame)
+        self.credential_combobox = UIFactory.create_combobox(
+            control_frame, textvariable=self.credential_var, state="readonly", width=28
+        )
+        self.credential_combobox.pack(anchor=tk.W, padx=5, pady=(0, 10), fill=tk.X)
+        self.credential_combobox.bind("<<ComboboxSelected>>", self._on_selection_change)
+
+        button_frame = UIFactory.create_frame(control_frame, padding=0)
+        button_frame.pack(anchor=tk.CENTER, pady=(10, 5))
+
+        self.run_button = UIFactory.create_button(button_frame, text="Run Workflow", command=self._on_run_workflow, state=tk.DISABLED)
+        self.run_button.pack(side=tk.LEFT, padx=5)
+
+        self.stop_button = UIFactory.create_button(button_frame, text="Stop Workflow", command=self._on_stop_workflow, state=tk.DISABLED)
+        self.stop_button.pack(side=tk.LEFT, padx=5)
+
+        # --- Log Area Section ---
+        log_frame = UIFactory.create_label_frame(self.main_frame, text="Execution Log")
+        log_frame.grid(row=0, column=1, rowspan=2, sticky=tk.NSEW, pady=(0,5), padx=(5,0)) # Span rows, column 1
+        log_frame.rowconfigure(0, weight=1)
+        log_frame.columnconfigure(0, weight=1)
+
+        log_scrolled_text = UIFactory.create_scrolled_text(log_frame, state=tk.DISABLED, height=25, width=70)
+        self.log_text_widget = log_scrolled_text["text"]
+        log_scrolled_text["frame"].grid(row=0, column=0, sticky=tk.NSEW)
+
+        self.logger.debug("Runner widgets created.")
+
+     # --- IWorkflowRunnerView Implementation ---
+
+    def set_workflow_list(self, workflow_names: List[str]) -> None:
+        """Populate the workflow listbox."""
+        if not self.workflow_list_widget: return
+        self.logger.debug(f"Setting workflow list with {len(workflow_names)} items.")
+        selected_name = self.get_selected_workflow_name()
+        self.workflow_list_widget.delete(0, tk.END)
+        sorted_names = sorted(workflow_names)
+        for name in sorted_names:
+            self.workflow_list_widget.insert(tk.END, name)
+        if selected_name in sorted_names:
+             try:
+                  list_items = self.workflow_list_widget.get(0, tk.END)
+                  idx = list_items.index(selected_name)
+                  self.workflow_list_widget.selection_set(idx)
+                  self.workflow_list_widget.activate(idx)
+                  self.workflow_list_widget.see(idx)
+             except (ValueError, tk.TclError): pass
+        self._on_selection_change()
+
+    def set_credential_list(self, credential_names: List[str]) -> None:
+        """Populate the credential combobox."""
+        if not self.credential_combobox or not self.credential_var : return
+        self.logger.debug(f"Setting credential list with {len(credential_names)} items.")
+        current_value = self.credential_var.get()
+        sorted_names = sorted(credential_names)
+        # Add a "-- None --" option? For now, assume selection means use it.
+        self.credential_combobox['values'] = sorted_names
+        if current_value in sorted_names:
+            self.credential_var.set(current_value)
+        elif sorted_names:
+            self.credential_var.set(sorted_names[0])
         else:
-            # For testing, we'll call the presenter methods to simulate initialization
-            self.presenter.get_workflow_list()
-            self.presenter.get_credential_list()
+             self.credential_var.set("")
+        self._on_selection_change()
 
-    def create_widgets(self) -> None:
-        """
-        Create the UI widgets.
+    def get_selected_workflow_name(self) -> Optional[str]:
+        """Get the name of the currently selected workflow."""
+        if not self.workflow_list_widget: return None
+        selection_indices = self.workflow_list_widget.curselection()
+        return self.workflow_list_widget.get(selection_indices[0]) if selection_indices else None
 
-        Raises:
-            UIError: If the widgets cannot be created
-        """
-        try:
-            # Create a frame for the workflow list
-            workflow_frame = ttk.LabelFrame(self.main_frame, text="Workflows")
-            workflow_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-            # Create the workflow listbox
-            self.workflow_listbox = tk.Listbox(workflow_frame, height=10, width=50)
-            self.workflow_listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-            # Create a frame for the credential selection
-            credential_frame = ttk.LabelFrame(self.main_frame, text="Credentials")
-            credential_frame.pack(fill=tk.X, padx=5, pady=5)
-
-            # Create the credential combobox
-            ttk.Label(credential_frame, text="Select Credential:").pack(side=tk.LEFT, padx=5, pady=5)
-            self.credential_combobox = ttk.Combobox(credential_frame, width=30)
-            self.credential_combobox.pack(side=tk.LEFT, padx=5, pady=5)
-
-            # Create a frame for the buttons
-            button_frame = ttk.Frame(self.main_frame)
-            button_frame.pack(fill=tk.X, padx=5, pady=5)
-
-            # Create the run button
-            self.run_button = ttk.Button(
-                button_frame, text="Run Workflow", command=self.on_run_workflow
-            )
-            self.run_button.pack(side=tk.LEFT, padx=5)
-
-            # Create the stop button
-            self.stop_button = ttk.Button(
-                button_frame, text="Stop Workflow", command=self.on_stop_workflow
-            )
-            self.stop_button.pack(side=tk.LEFT, padx=5)
-
-            # Create a frame for the log
-            log_frame = ttk.LabelFrame(self.main_frame, text="Log")
-            log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-            # Create the log text widget
-            self.log_text = tk.Text(log_frame, height=10, width=50)
-            self.log_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-            # Create a scrollbar for the log text
-            scrollbar = ttk.Scrollbar(self.log_text, command=self.log_text.yview)
-            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-            self.log_text.config(yscrollcommand=scrollbar.set)
-
-            self.logger.debug("Widgets created")
-        except Exception as e:
-            error_msg = "Failed to create widgets"
-            self.logger.error(error_msg, exc_info=True)
-            raise UIError(error_msg, component_name="WorkflowRunnerView", cause=e)
-
-    def populate_workflow_list(self) -> None:
-        """
-        Populate the workflow listbox with available workflows.
-
-        Raises:
-            UIError: If the workflow list cannot be populated
-        """
-        try:
-            # Clear the listbox
-            self.workflow_listbox.delete(0, tk.END)
-
-            # Get the list of workflows from the presenter
-            workflows = self.presenter.get_workflow_list()
-
-            # Add each workflow to the listbox
-            for workflow in workflows:
-                self.workflow_listbox.insert(tk.END, workflow)
-
-            self.logger.debug(f"Populated workflow list with {len(workflows)} workflows")
-        except Exception as e:
-            error_msg = "Failed to populate workflow list"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
-
-    def populate_credential_list(self) -> None:
-        """
-        Populate the credential combobox with available credentials.
-
-        Raises:
-            UIError: If the credential list cannot be populated
-        """
-        try:
-            # Clear the combobox
-            self.credential_combobox.set("")
-
-            # Get the list of credentials from the presenter
-            credentials = self.presenter.get_credential_list()
-
-            # Extract the credential names
-            credential_names = [credential.get("name", "") for credential in credentials]
-
-            # Set the combobox values
-            self.credential_combobox["values"] = credential_names
-
-            self.logger.debug(f"Populated credential list with {len(credentials)} credentials")
-        except Exception as e:
-            error_msg = "Failed to populate credential list"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
-
-    def on_run_workflow(self) -> None:
-        """
-        Handle run workflow button click.
-
-        Raises:
-            UIError: If there is an error running the workflow
-        """
-        try:
-            # Get the selected workflow
-            workflow_name = self.get_selected_workflow()
-            if workflow_name is None:
-                messagebox.showwarning("Warning", "No workflow selected")
-                return
-
-            # Get the selected credential
-            credential_name = self.get_selected_credential()
-            if credential_name is None:
-                messagebox.showwarning("Warning", "No credential selected")
-                return
-
-            # Log the start of the workflow
-            self.log_message(f"Starting workflow: {workflow_name}")
-
-            # Run the workflow
-            success = self.presenter.run_workflow(workflow_name, credential_name)
-
-            # Log the result
-            if success:
-                self.log_message("Workflow completed successfully")
-            else:
-                self.log_message("Workflow failed to complete")
-        except Exception as e:
-            error_msg = "Failed to run workflow"
-            self.logger.error(error_msg, exc_info=True)
-            self.log_message(f"Error: {str(e)}")
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
-
-    def on_stop_workflow(self) -> None:
-        """
-        Handle stop workflow button click.
-
-        Raises:
-            UIError: If there is an error stopping the workflow
-        """
-        try:
-            # Log the stop request
-            self.log_message("Stopping workflow...")
-
-            # Stop the workflow
-            success = self.presenter.stop_workflow()
-
-            # Log the result
-            if success:
-                self.log_message("Workflow stopped successfully")
-            else:
-                self.log_message("Failed to stop workflow")
-        except Exception as e:
-            error_msg = "Failed to stop workflow"
-            self.logger.error(error_msg, exc_info=True)
-            self.log_message(f"Error: {str(e)}")
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
-
-    def get_selected_workflow(self) -> Optional[str]:
-        """
-        Get the name of the selected workflow.
-
-        Returns:
-            The name of the selected workflow, or None if no workflow is selected
-        """
-        selected_indices = self.workflow_listbox.curselection()
-        if not selected_indices:
-            return None
-
-        return self.workflow_listbox.get(selected_indices[0])
-
-    def get_selected_credential(self) -> Optional[str]:
-        """
-        Get the name of the selected credential.
-
-        Returns:
-            The name of the selected credential, or None if no credential is selected
-        """
-        credential_name = self.credential_combobox.get()
-        if not credential_name:
-            return None
-
-        return credential_name
+    def get_selected_credential_name(self) -> Optional[str]:
+        """Get the name of the currently selected credential."""
+        value = self.credential_var.get() if self.credential_var else None
+        return value if value else None
 
     def log_message(self, message: str) -> None:
-        """
-        Log a message to the log text widget.
+        """Append a message to the execution log."""
+        if not self.log_text_widget: return
+        def _update_log():
+             try:
+                  current_state = self.log_text_widget['state']
+                  self.log_text_widget.config(state=tk.NORMAL)
+                  timestamp = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                  self.log_text_widget.insert(tk.END, f"[{timestamp}] {message}\n")
+                  self.log_text_widget.see(tk.END)
+                  self.log_text_widget.config(state=current_state)
+             except tk.TclError as e: self.logger.error(f"Failed to log message: {e}")
+             except Exception as e: self.logger.exception(f"Unexpected error logging: {e}")
+        try:
+             if self.log_text_widget.winfo_exists(): self.log_text_widget.after(0, _update_log)
+        except Exception as e: self.logger.error(f"Error scheduling log update: {e}")
 
-        Args:
-            message: The message to log
-        """
-        # Log to the logger
-        self.logger.info(message)
+    def clear_log(self) -> None:
+        """Clear the execution log."""
+        if not self.log_text_widget: return
+        def _clear():
+            try:
+                current_state = self.log_text_widget['state']
+                self.log_text_widget.config(state=tk.NORMAL)
+                self.log_text_widget.delete('1.0', tk.END)
+                self.log_text_widget.config(state=current_state)
+                self.logger.debug("Log cleared.")
+            except tk.TclError as e: self.logger.error(f"Failed to clear log: {e}")
+        try:
+            if self.log_text_widget.winfo_exists(): self.log_text_widget.after(0, _clear)
+        except Exception as e: self.logger.error(f"Error scheduling log clear: {e}")
 
-        # If we're in a test environment, we might not have a log_text widget
-        if self.log_text is None:
-            return
+    def set_running_state(self, is_running: bool) -> None:
+        """Update UI controls based on running state."""
+        def _update_state():
+            self.logger.debug(f"Setting running state: {is_running}")
+            stop_state = tk.NORMAL if is_running else tk.DISABLED
+            can_run_selection = self.get_selected_workflow_name() is not None
+            run_state = tk.NORMAL if not is_running and can_run_selection else tk.DISABLED
+            list_state = tk.DISABLED if is_running else tk.NORMAL
+            combo_state = tk.DISABLED if is_running else "readonly"
 
-        # Enable the text widget for editing
-        self.log_text.config(state=tk.NORMAL)
+            if getattr(self, 'run_button', None): self.run_button.config(state=run_state)
+            if getattr(self, 'stop_button', None): self.stop_button.config(state=stop_state)
+            if getattr(self, 'workflow_list_widget', None): self.workflow_list_widget.config(state=list_state)
+            if getattr(self, 'credential_combobox', None): self.credential_combobox.config(state=combo_state)
 
-        # Add the message to the log
-        self.log_text.insert(tk.END, message + "\n")
+            status_msg = "Workflow running..." if is_running else "Ready."
+            self.set_status(status_msg)
 
-        # Scroll to the end of the log
-        self.log_text.see(tk.END)
+            if self.status_bar:
+                 if is_running: self.status_bar.start_progress_indeterminate()
+                 else: self.status_bar.stop_progress()
 
-        # Disable the text widget for editing
-        self.log_text.config(state=tk.DISABLED)
+        try:
+             if self.main_frame.winfo_exists(): self.main_frame.after(0, _update_state)
+        except Exception as e: self.logger.error(f"Error scheduling running state update: {e}")
+
+    def clear(self) -> None:
+        """Clear lists and log."""
+        self.logger.debug("Clearing runner view.")
+        if self.workflow_list_widget: self.workflow_list_widget.delete(0, tk.END)
+        if self.credential_combobox: self.credential_combobox['values'] = []
+        if self.credential_var: self.credential_var.set("")
+        self.clear_log()
+        self.set_running_state(False) # Reset state
+        super().clear() # Call base clear
+
+    # --- Internal Event Handlers ---
+
+    def _on_selection_change(self, event: Optional[tk.Event] = None) -> None:
+        """Enable/disable run button based on selections and running state."""
+        # State is handled within set_running_state, call that to update based on current running status
+        is_running = getattr(self.presenter, '_is_running', False)
+        self.set_running_state(is_running)
+
+
+    def _on_run_workflow(self) -> None:
+        """Handle 'Run Workflow' button press."""
+        self.logger.debug("Run workflow button pressed.")
+        workflow = self.get_selected_workflow_name()
+        credential = self.get_selected_credential_name() # Might be None
+        if workflow:
+            self.presenter.run_workflow(workflow, credential) # Delegate to presenter
+        else:
+             self.logger.warning("Run button pressed but no workflow selected.")
+             self.display_message("Run Error", "Please select a workflow to run.")
+
+
+    def _on_stop_workflow(self) -> None:
+        """Handle 'Stop Workflow' button press."""
+        self.logger.debug("Stop workflow button pressed.")
+        self.presenter.stop_workflow() # Delegate to presenter

@@ -6,7 +6,7 @@ ensuring they adhere to the IAction interface and provide common functionality.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 # Assuming these interfaces and classes are defined elsewhere
 from src.core.interfaces import IAction, IWebDriver, ICredentialRepository
@@ -46,14 +46,16 @@ class ActionBase(IAction, ABC):
         default_name = self.action_type
         if name is None:
             self.name = default_name
-        elif not isinstance(name, str) or not name:
-            logger.warning(f"Invalid name '{name}' provided for {self.action_type} action. Defaulting to '{default_name}'.")
+        elif not isinstance(name, str) or not name.strip(): # Check for non-empty stripped name
+            logger.warning(f"Invalid or empty name '{name}' provided for {self.action_type} action. Defaulting to '{default_name}'.")
             self.name = default_name
         else:
-            self.name = name
+            self.name = name.strip() # Store stripped name
 
+        # Store unused kwargs for potential future use or debugging, but warn
+        self._unused_kwargs = kwargs
         if kwargs:
-            logger.warning(f"Unused parameters provided for {self.action_type} action '{self.name}': {kwargs.keys()}")
+            logger.warning(f"Unused parameters provided for {self.action_type} action '{self.name}': {list(kwargs.keys())}")
 
         logger.debug(f"Initialized action: {self.action_type} (Name: {self.name})")
 
@@ -61,10 +63,8 @@ class ActionBase(IAction, ABC):
         """
         Validate that the action has the required configuration.
 
-        Base implementation always returns True. Subclasses should override
-        this method to provide specific validation logic based on their parameters.
-        It's recommended to raise ValidationError on failure for clarity,
-        although returning False is also supported by the interface.
+        Base implementation validates the 'name' attribute. Subclasses should
+        call `super().validate()` and then add their specific parameter checks.
 
         Returns:
             bool: True if the action configuration is valid.
@@ -72,7 +72,6 @@ class ActionBase(IAction, ABC):
         Raises:
             ValidationError: If validation fails (recommended).
         """
-        # Basic check: name should be a non-empty string
         if not isinstance(self.name, str) or not self.name:
              raise ValidationError("Action name must be a non-empty string.", field_name="name")
         return True
@@ -81,24 +80,20 @@ class ActionBase(IAction, ABC):
     def execute(
         self,
         driver: IWebDriver,
-        credential_repo: Optional[ICredentialRepository] = None
+        credential_repo: Optional[ICredentialRepository] = None,
+        context: Optional[Dict[str, Any]] = None # Context added
     ) -> ActionResult:
         """
-        Execute the action using the provided web driver.
+        Execute the action using the provided web driver and context.
 
         Args:
             driver (IWebDriver): The web driver instance to perform browser operations.
-            credential_repo (Optional[ICredentialRepository]): Repository for credentials,
-                required by some actions like TypeAction. Defaults to None.
+            credential_repo (Optional[ICredentialRepository]): Repository for credentials.
+            context (Optional[Dict[str, Any]]): Dictionary holding execution context
+                                                 (e.g., loop variables). Defaults to None.
 
         Returns:
             ActionResult: An object indicating the outcome (success/failure) and details.
-
-        Raises:
-            NotImplementedError: If a subclass does not implement this method.
-            ActionError: For action-specific execution failures.
-            CredentialError: For credential-related failures.
-            WebDriverError: For driver-related failures during execution.
         """
         pass
 
@@ -107,34 +102,34 @@ class ActionBase(IAction, ABC):
         """
         Serialize the action instance to a dictionary representation.
 
-        This dictionary should contain all necessary information to reconstruct
-        the action instance later, typically including 'type', 'name', and
-        action-specific parameters. The 'type' key MUST match the class's
-        `action_type` attribute.
+        Must include 'type' and 'name' keys. Subclasses must add their parameters.
 
         Returns:
             Dict[str, Any]: A dictionary representing the action.
-
-        Raises:
-            NotImplementedError: If a subclass does not implement this method.
         """
         # Ensure base implementation includes type and name
-        # Subclasses should call super().to_dict() and update the dictionary
-        # Or implement their own, ensuring 'type' and 'name' are present
         return {"type": self.action_type, "name": self.name}
 
+    def get_nested_actions(self) -> List['IAction']:
+        """Return any nested actions contained within this action."""
+        return []
 
     def __repr__(self) -> str:
         """Return a developer-friendly string representation."""
-        # Collect subclass attributes for a more informative repr
         attrs = []
         for key, value in self.__dict__.items():
-             if key != 'name' and not key.startswith('_'): # Exclude name (already shown) and private attrs
-                 attrs.append(f"{key}={value!r}")
+             if key == 'name' or key.startswith('_'): continue
+             if isinstance(value, list) and key.endswith("_actions"):
+                 repr_val = f"[{len(value)} actions]"
+             else:
+                 try:
+                      repr_val = repr(value); max_len=50
+                      if len(repr_val) > max_len: repr_val = repr_val[:max_len-3] + "..."
+                 except Exception: repr_val = "<repr error>"
+             attrs.append(f"{key}={repr_val}")
         attr_str = ", ".join(attrs)
         return f"{self.__class__.__name__}(name='{self.name}'{', ' + attr_str if attr_str else ''})"
 
     def __str__(self) -> str:
-        """Return a user-friendly string representation."""
-        # Subclasses might want to override this for better display in UI lists
+        """Return a user-friendly string representation for UI display."""
         return f"{self.action_type}: {self.name}"

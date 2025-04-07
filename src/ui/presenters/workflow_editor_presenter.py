@@ -1,286 +1,236 @@
-"""Workflow editor presenter module for AutoQliq.
-
-This module provides the presenter component for the workflow editor.
-"""
+"""Workflow editor presenter implementation for AutoQliq."""
 
 import logging
 from typing import List, Dict, Any, Optional
 
-from src.core.interfaces import IWorkflowRepository, IAction
-from src.core.exceptions import WorkflowError, ActionError
+# Core dependencies
+from src.core.interfaces import IAction
+from src.core.interfaces.service import IWorkflowService # Use Service Interface
+from src.core.exceptions import WorkflowError, ActionError, ValidationError, AutoQliqError
+
+# UI dependencies
+from src.ui.interfaces.presenter import IWorkflowEditorPresenter
+from src.ui.interfaces.view import IWorkflowEditorView
+from src.ui.presenters.base_presenter import BasePresenter
+# Use ActionFactory directly for creating/validating action data from UI dialog
+from src.core.actions.factory import ActionFactory
 
 
-class WorkflowEditorPresenter:
+class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEditorPresenter):
     """
-    Presenter for the workflow editor view.
-    
-    This class handles the business logic for the workflow editor, mediating between
-    the view and the repositories.
-    
-    Attributes:
-        workflow_repository: Repository for workflow storage and retrieval
-        action_factory: Factory for creating action objects
-        view: The view component
-        logger: Logger for recording presenter operations and errors
+    Presenter for the workflow editor view. Handles logic for creating, loading,
+    saving workflows, and managing their actions by interacting with the WorkflowService.
     """
-    
-    def __init__(self, workflow_repository: IWorkflowRepository, action_factory: Any):
+
+    def __init__(self, workflow_service: IWorkflowService, view: Optional[IWorkflowEditorView] = None):
         """
-        Initialize a new WorkflowEditorPresenter.
-        
+        Initialize the presenter.
+
         Args:
-            workflow_repository: Repository for workflow storage and retrieval
-            action_factory: Factory for creating action objects
+            workflow_service: The service handling workflow business logic and persistence.
+            view: The associated view instance (optional).
         """
-        self.workflow_repository = workflow_repository
-        self.action_factory = action_factory
-        self.view = None
-        self.logger = logging.getLogger(__name__)
+        super().__init__(view)
+        if workflow_service is None:
+             raise ValueError("Workflow service cannot be None.")
+        self.workflow_service = workflow_service
+        # Store the currently loaded workflow actions in memory for editing
+        self._current_workflow_name: Optional[str] = None
+        self._current_actions: List[IAction] = [] # Presenter holds domain objects
+        self.logger.info("WorkflowEditorPresenter initialized.")
 
+    def set_view(self, view: IWorkflowEditorView) -> None:
+        """Set the view and perform initial population."""
+        super().set_view(view)
+        self.initialize_view()
+
+    @BasePresenter.handle_errors("Initializing editor view")
+    def initialize_view(self) -> None:
+        """Populate the view with initial data (workflow list)."""
+        if not self.view: return
+        self.logger.debug("Initializing editor view...")
+        workflows = self.get_workflow_list() # Uses service
+        self.view.set_workflow_list(workflows or [])
+        self._update_action_list_display() # Show empty actions initially
+        self.view.set_status("Editor ready. Select a workflow or create a new one.")
+        self.logger.debug("Editor view initialized.")
+
+    @BasePresenter.handle_errors("Getting workflow list")
     def get_workflow_list(self) -> List[str]:
-        """
-        Get a list of available workflows.
-        
-        Returns:
-            A list of workflow names
-        """
-        try:
-            return self.workflow_repository.list_workflows()
-        except WorkflowError as e:
-            self.logger.error(f"Error getting workflow list: {str(e)}")
-            return []
-        except Exception as e:
-            self.logger.error(f"Unexpected error getting workflow list: {str(e)}", exc_info=True)
-            return []
+        """Get the list of available workflow names via the service."""
+        self.logger.debug("Fetching workflow list from service.")
+        return self.workflow_service.list_workflows()
 
-    def create_workflow(self, name: str) -> bool:
-        """
-        Create a new workflow.
-        
-        Args:
-            name: The name of the workflow to create
-            
-        Returns:
-            True if the workflow was created successfully, False otherwise
-        """
-        try:
-            self.workflow_repository.create_workflow(name)
-            self.logger.info(f"Created workflow: {name}")
-            return True
-        except WorkflowError as e:
-            self.logger.error(f"Error creating workflow: {str(e)}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Unexpected error creating workflow: {str(e)}", exc_info=True)
-            return False
+    @BasePresenter.handle_errors("Loading workflow")
+    def load_workflow(self, name: str) -> None:
+        """Load a workflow via the service and update the view."""
+        if not self.view: return
+        if not name:
+             raise ValidationError("Workflow name cannot be empty.", field_name="workflow_name")
 
-    def delete_workflow(self, name: str) -> bool:
-        """
-        Delete a workflow.
-        
-        Args:
-            name: The name of the workflow to delete
-            
-        Returns:
-            True if the workflow was deleted successfully, False otherwise
-        """
-        try:
-            result = self.workflow_repository.delete(name)
-            if result:
-                self.logger.info(f"Deleted workflow: {name}")
-            else:
-                self.logger.warning(f"Workflow not found: {name}")
-            return result
-        except WorkflowError as e:
-            self.logger.error(f"Error deleting workflow: {str(e)}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Unexpected error deleting workflow: {str(e)}", exc_info=True)
-            return False
+        self.logger.info(f"Loading workflow: {name}")
+        # Service handles interaction with repository
+        actions = self.workflow_service.get_workflow(name) # Raises WorkflowError if not found etc.
+        self._current_workflow_name = name
+        self._current_actions = actions if actions else [] # Ensure it's a list
+        self._update_action_list_display()
+        self.view.set_status(f"Workflow '{name}' loaded with {len(self._current_actions)} actions.")
+        self.logger.info(f"Successfully loaded workflow '{name}'.")
 
-    def load_workflow(self, name: str) -> Optional[List[IAction]]:
-        """
-        Load a workflow.
-        
-        Args:
-            name: The name of the workflow to load
-            
-        Returns:
-            The list of actions in the workflow, or None if the workflow could not be loaded
-        """
-        try:
-            actions = self.workflow_repository.load(name)
-            self.logger.info(f"Loaded workflow: {name}")
-            return actions
-        except WorkflowError as e:
-            self.logger.error(f"Error loading workflow: {str(e)}")
-            return None
-        except Exception as e:
-            self.logger.error(f"Unexpected error loading workflow: {str(e)}", exc_info=True)
-            return None
+    @BasePresenter.handle_errors("Saving workflow")
+    def save_workflow(self, name: Optional[str] = None, actions_data: Optional[List[Dict[str, Any]]] = None) -> None:
+        """Save the current workflow actions via the service."""
+        if not self.view: return
 
-    def save_workflow(self, name: str, actions: Optional[List[IAction]] = None) -> bool:
-        """
-        Save a workflow.
-        
-        Args:
-            name: The name of the workflow to save
-            actions: The list of actions to save, or None to use the currently loaded actions
-            
-        Returns:
-            True if the workflow was saved successfully, False otherwise
-        """
-        try:
-            # If actions are not provided, load them from the repository
-            if actions is None:
-                actions = self.workflow_repository.load(name)
-                
-            # Save the workflow
-            self.workflow_repository.save(name, actions)
-            self.logger.info(f"Saved workflow: {name}")
-            return True
-        except WorkflowError as e:
-            self.logger.error(f"Error saving workflow: {str(e)}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Unexpected error saving workflow: {str(e)}", exc_info=True)
-            return False
+        target_name = name or self._current_workflow_name
+        if not target_name:
+             raise WorkflowError("Cannot save workflow without a name. Load or create a workflow first.")
 
-    def add_action(self, workflow_name: str, action_data: Dict[str, Any]) -> bool:
-        """
-        Add an action to a workflow.
-        
-        Args:
-            workflow_name: The name of the workflow to add the action to
-            action_data: The data for the action to add
-            
-        Returns:
-            True if the action was added successfully, False otherwise
-        """
-        try:
-            # Load the workflow
-            actions = self.workflow_repository.load(workflow_name)
-            
-            # Create the action
-            action = self.action_factory.create_action(action_data)
-            
-            # Add the action to the workflow
-            actions.append(action)
-            
-            # Save the workflow
-            self.workflow_repository.save(workflow_name, actions)
-            
-            self.logger.info(f"Added action to workflow: {workflow_name}")
-            return True
-        except (WorkflowError, ActionError) as e:
-            self.logger.error(f"Error adding action to workflow: {str(e)}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Unexpected error adding action to workflow: {str(e)}", exc_info=True)
-            return False
+        self.logger.info(f"Attempting to save workflow: {target_name}")
+        actions_to_save = self._current_actions
 
-    def update_action(self, workflow_name: str, action_index: int, action_data: Dict[str, Any]) -> bool:
-        """
-        Update an action in a workflow.
-        
-        Args:
-            workflow_name: The name of the workflow to update the action in
-            action_index: The index of the action to update
-            action_data: The new data for the action
-            
-        Returns:
-            True if the action was updated successfully, False otherwise
-        """
-        try:
-            # Load the workflow
-            actions = self.workflow_repository.load(workflow_name)
-            
-            # Check that the action index is valid
-            if action_index < 0 or action_index >= len(actions):
-                self.logger.error(f"Invalid action index: {action_index}")
-                return False
-                
-            # Create the new action
-            new_action = self.action_factory.create_action(action_data)
-            
-            # Replace the action in the workflow
-            actions[action_index] = new_action
-            
-            # Save the workflow
-            self.workflow_repository.save(workflow_name, actions)
-            
-            self.logger.info(f"Updated action in workflow: {workflow_name}")
-            return True
-        except (WorkflowError, ActionError) as e:
-            self.logger.error(f"Error updating action in workflow: {str(e)}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Unexpected error updating action in workflow: {str(e)}", exc_info=True)
-            return False
+        # Service handles validation, serialization, saving. Decorator catches errors.
+        success = self.workflow_service.save_workflow(target_name, actions_to_save)
+        if success: # Service method returns bool now
+            self._current_workflow_name = target_name
+            self.view.set_status(f"Workflow '{target_name}' saved successfully.")
+            self.logger.info(f"Successfully saved workflow '{target_name}'.")
+            workflows = self.get_workflow_list()
+            if self.view: self.view.set_workflow_list(workflows or [])
 
-    def delete_action(self, workflow_name: str, action_index: int) -> bool:
-        """
-        Delete an action from a workflow.
-        
-        Args:
-            workflow_name: The name of the workflow to delete the action from
-            action_index: The index of the action to delete
-            
-        Returns:
-            True if the action was deleted successfully, False otherwise
-        """
-        try:
-            # Load the workflow
-            actions = self.workflow_repository.load(workflow_name)
-            
-            # Check that the action index is valid
-            if action_index < 0 or action_index >= len(actions):
-                self.logger.error(f"Invalid action index: {action_index}")
-                return False
-                
-            # Remove the action from the workflow
-            del actions[action_index]
-            
-            # Save the workflow
-            self.workflow_repository.save(workflow_name, actions)
-            
-            self.logger.info(f"Deleted action from workflow: {workflow_name}")
-            return True
-        except WorkflowError as e:
-            self.logger.error(f"Error deleting action from workflow: {str(e)}")
-            return False
-        except Exception as e:
-            self.logger.error(f"Unexpected error deleting action from workflow: {str(e)}", exc_info=True)
-            return False
 
-    def get_action(self, workflow_name: str, action_index: int) -> Optional[Dict[str, Any]]:
-        """
-        Get an action from a workflow.
-        
-        Args:
-            workflow_name: The name of the workflow to get the action from
-            action_index: The index of the action to get
-            
-        Returns:
-            The action data, or None if the action could not be retrieved
-        """
+    @BasePresenter.handle_errors("Creating new workflow")
+    def create_new_workflow(self, name: str) -> None:
+        """Create a new, empty workflow via the service."""
+        if not self.view: return
+        if not name:
+             raise ValidationError("Workflow name cannot be empty.", field_name="workflow_name")
+
+        self.logger.info(f"Creating new workflow: {name}")
+        success = self.workflow_service.create_workflow(name) # Service raises errors if exists etc.
+        if success:
+            self.view.set_status(f"Created new workflow: '{name}'.")
+            self.logger.info(f"Successfully created workflow '{name}'.")
+            workflows = self.get_workflow_list()
+            if self.view:
+                 self.view.set_workflow_list(workflows or [])
+                 self.load_workflow(name) # Load the newly created empty workflow
+
+
+    @BasePresenter.handle_errors("Deleting workflow")
+    def delete_workflow(self, name: str) -> None:
+        """Delete a workflow via the service."""
+        if not self.view: return
+        if not name:
+             raise ValidationError("Workflow name cannot be empty.", field_name="workflow_name")
+
+        self.logger.info(f"Deleting workflow: {name}")
+        deleted = self.workflow_service.delete_workflow(name) # Service raises errors
+        if deleted:
+            self.view.set_status(f"Workflow '{name}' deleted.")
+            self.logger.info(f"Successfully deleted workflow '{name}'.")
+            if self._current_workflow_name == name:
+                 self._current_workflow_name = None
+                 self._current_actions = []
+                 self._update_action_list_display()
+            workflows = self.get_workflow_list()
+            if self.view: self.view.set_workflow_list(workflows or [])
+        else:
+             # Service returned False (likely not found)
+             raise WorkflowError(f"Workflow '{name}' not found, cannot delete.", workflow_name=name)
+
+
+    # --- Action Management (Operate on internal state, save separately) ---
+
+    def add_action(self, action_data: Dict[str, Any]) -> None:
+        """Add a new action to the current in-memory list and update view."""
+        if not self.view: return
+        if self._current_workflow_name is None:
+             self._handle_error(WorkflowError("No workflow loaded. Cannot add action."), "adding action")
+             return
+
+        self.logger.debug(f"Attempting to add action to '{self._current_workflow_name}': {action_data.get('type')}")
         try:
-            # Load the workflow
-            actions = self.workflow_repository.load(workflow_name)
-            
-            # Check that the action index is valid
-            if action_index < 0 or action_index >= len(actions):
-                self.logger.error(f"Invalid action index: {action_index}")
-                return None
-                
-            # Get the action
-            action = actions[action_index]
-            
-            # Convert the action to a dictionary
-            return action.to_dict()
-        except WorkflowError as e:
-            self.logger.error(f"Error getting action from workflow: {str(e)}")
-            return None
+            new_action = ActionFactory.create_action(action_data) # Raises ActionError/ValidationError
+            new_action.validate() # Raises ValidationError
+            self._current_actions.append(new_action)
+            self._update_action_list_display()
+            self.view.set_status(f"Action '{new_action.name}' added to '{self._current_workflow_name}' (unsaved).")
+            self.logger.info(f"Added action {new_action.action_type} to internal list for '{self._current_workflow_name}'.")
+        except (ActionError, ValidationError) as e:
+             self._handle_error(e, "adding action")
         except Exception as e:
-            self.logger.error(f"Unexpected error getting action from workflow: {str(e)}", exc_info=True)
-            return None
+             self._handle_error(AutoQliqError("Unexpected error adding action.", cause=e), "adding action")
+
+
+    def update_action(self, index: int, action_data: Dict[str, Any]) -> None:
+        """Update an action in the current in-memory list and update view."""
+        if not self.view: return
+        if self._current_workflow_name is None:
+             self._handle_error(WorkflowError("No workflow loaded. Cannot update action."), "updating action")
+             return
+        if not (0 <= index < len(self._current_actions)):
+            self._handle_error(IndexError(f"Invalid action index for update: {index}"), "updating action")
+            return
+
+        self.logger.debug(f"Attempting to update action at index {index} in '{self._current_workflow_name}'")
+        try:
+            updated_action = ActionFactory.create_action(action_data) # Raises ActionError/ValidationError
+            updated_action.validate() # Raises ValidationError
+            self._current_actions[index] = updated_action
+            self._update_action_list_display()
+            self.view.set_status(f"Action {index+1} ('{updated_action.name}') updated in '{self._current_workflow_name}' (unsaved).")
+            self.logger.info(f"Updated action at index {index} in internal list for '{self._current_workflow_name}'.")
+        except (ActionError, ValidationError) as e:
+            self._handle_error(e, "updating action")
+        except Exception as e:
+             self._handle_error(AutoQliqError("Unexpected error updating action.", cause=e), "updating action")
+
+
+    def delete_action(self, index: int) -> None:
+        """Delete an action from the current in-memory list and update view."""
+        if not self.view: return
+        if self._current_workflow_name is None:
+             self._handle_error(WorkflowError("No workflow loaded. Cannot delete action."), "deleting action")
+             return
+        if not (0 <= index < len(self._current_actions)):
+             self._handle_error(IndexError(f"Invalid action index for delete: {index}"), "deleting action")
+             return
+
+        self.logger.debug(f"Attempting to delete action at index {index} from '{self._current_workflow_name}'")
+        try:
+            deleted_action = self._current_actions.pop(index)
+            self._update_action_list_display()
+            self.view.set_status(f"Action {index+1} ('{deleted_action.name}') deleted from '{self._current_workflow_name}' (unsaved).")
+            self.logger.info(f"Deleted action at index {index} from internal list for '{self._current_workflow_name}'.")
+        except IndexError:
+             self._handle_error(IndexError(f"Action index {index} out of range during delete."), "deleting action")
+        except Exception as e:
+             self._handle_error(AutoQliqError("Unexpected error deleting action.", cause=e), "deleting action")
+
+
+    def get_action_data(self, index: int) -> Optional[Dict[str, Any]]:
+         """Get the data dictionary for the action at the specified index."""
+         if not (0 <= index < len(self._current_actions)):
+              self.logger.warning(f"Attempted to get action data for invalid index: {index}")
+              return None
+         try:
+              action = self._current_actions[index]
+              return action.to_dict()
+         except Exception as e:
+              self._handle_error(AutoQliqError(f"Failed to get dictionary for action at index {index}", cause=e), "getting action data")
+              return None
+
+    # --- Helper Methods ---
+
+    def _update_action_list_display(self) -> None:
+        """Format the current actions and tell the view to display them."""
+        if not self.view: return
+        try:
+             # Use str(action) which should provide a user-friendly summary
+             actions_display = [f"{i+1}: {str(action)}" for i, action in enumerate(self._current_actions)]
+             self.view.set_action_list(actions_display)
+             self.logger.debug(f"Updated action list display in view for '{self._current_workflow_name}'. Actions: {len(actions_display)}")
+        except Exception as e:
+            # Use the internal error handler which will log and show error in view
+            self._handle_error(UIError("Failed to update action list display.", cause=e), "updating action list")

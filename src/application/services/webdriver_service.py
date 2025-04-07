@@ -1,96 +1,121 @@
 """WebDriver service implementation for AutoQliq."""
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
+# Core dependencies
 from src.core.interfaces import IWebDriver
-from src.core.exceptions import WebDriverError
-from src.application.interfaces import IWebDriverService
-from src.infrastructure.webdrivers.browser_type import BrowserType
+from src.core.interfaces.service import IWebDriverService
+from src.core.exceptions import WebDriverError, ConfigError, AutoQliqError
+
+# Infrastructure dependencies
+from src.infrastructure.webdrivers.factory import WebDriverFactory
+from src.infrastructure.webdrivers.base import BrowserType
+
+# Common utilities
 from src.infrastructure.common.error_handling import handle_exceptions
 from src.infrastructure.common.logging_utils import log_method_call
+# Configuration
+from src.config import config # Import configured instance
+
+logger = logging.getLogger(__name__)
 
 
 class WebDriverService(IWebDriverService):
-    """Implementation of IWebDriverService.
-    
-    This class provides services for managing web drivers, including creating,
-    configuring, and disposing of web driver instances.
-    
-    Attributes:
-        web_driver_factory: Factory for creating web driver instances
-        logger: Logger for recording service operations and errors
     """
-    
-    def __init__(self, web_driver_factory: Any):
-        """Initialize a new WebDriverService.
-        
+    Implementation of IWebDriverService. Manages WebDriver instances via a factory.
+
+    Acts primarily as a facade over the WebDriverFactory, integrating configuration
+    and ensuring consistent error handling and logging at the service layer.
+    """
+
+    def __init__(self, webdriver_factory: WebDriverFactory):
+        """Initialize a new WebDriverService."""
+        if webdriver_factory is None:
+            raise ValueError("WebDriver factory cannot be None.")
+        self.webdriver_factory = webdriver_factory
+        logger.info("WebDriverService initialized.")
+
+    @log_method_call(logger)
+    @handle_exceptions(WebDriverError, "Failed to create web driver", reraise_types=(WebDriverError, ConfigError))
+    def create_web_driver(
+        self,
+        browser_type_str: Optional[str] = None, # Make optional, use config default
+        selenium_options: Optional[Any] = None, # Specific options object
+        playwright_options: Optional[Dict[str, Any]] = None, # Specific options dict
+        driver_type: str = "selenium", # 'selenium' or 'playwright'
+        **kwargs: Any # Allow passing other factory options like implicit_wait_seconds
+    ) -> IWebDriver:
+        """Create a new web driver instance using the factory and configuration.
+
         Args:
-            web_driver_factory: Factory for creating web driver instances
-        """
-        self.web_driver_factory = web_driver_factory
-        self.logger = logging.getLogger(__name__)
-        
-        # Map of browser type strings to BrowserType enum values
-        self.browser_type_map = {
-            "chrome": BrowserType.CHROME,
-            "firefox": BrowserType.FIREFOX,
-            "edge": BrowserType.EDGE
-        }
-    
-    @log_method_call(logging.getLogger(__name__))
-    @handle_exceptions(WebDriverError, "Failed to create web driver")
-    def create_web_driver(self, browser_type: str, options: Optional[Dict[str, Any]] = None) -> IWebDriver:
-        """Create a new web driver instance.
-        
-        Args:
-            browser_type: The type of browser to create a driver for
-            options: Optional dictionary of browser-specific options
-            
+            browser_type_str: Optional name of the browser type (e.g., "chrome").
+                              If None, uses default from config.
+            selenium_options: Specific Selenium options object (e.g., ChromeOptions).
+            playwright_options: Specific Playwright launch options dictionary.
+            driver_type: The driver backend ('selenium' or 'playwright').
+            **kwargs: Additional arguments passed to the factory (e.g., `implicit_wait_seconds`, `webdriver_path`).
+
         Returns:
-            A configured web driver instance
-            
-        Raises:
-            WebDriverError: If there is an error creating the web driver
+            A configured web driver instance conforming to IWebDriver.
         """
-        self.logger.info(f"Creating {browser_type} web driver")
-        
-        # Convert browser type string to enum value
-        if browser_type.lower() not in self.browser_type_map:
-            error_msg = f"Unsupported browser type: {browser_type}"
-            self.logger.error(error_msg)
-            raise WebDriverError(error_msg)
-        
-        browser_enum = self.browser_type_map[browser_type.lower()]
-        
+        browser_to_use_str = browser_type_str or config.default_browser
+        logger.info(f"SERVICE: Requesting creation of {driver_type} driver for browser '{browser_to_use_str}'")
+
         try:
-            # Create the web driver
-            return self.web_driver_factory.create_driver(browser_enum, options=options)
-        except Exception as e:
-            error_msg = f"Failed to create web driver: {str(e)}"
-            self.logger.error(error_msg)
-            raise WebDriverError(error_msg) from e
-    
-    @log_method_call(logging.getLogger(__name__))
+            # Convert string to BrowserType enum
+            browser_enum = BrowserType.from_string(browser_to_use_str) # Raises ValueError
+        except ValueError as e:
+            # Convert ValueError to ConfigError
+            raise ConfigError(str(e), cause=e) from e
+
+        # Prepare factory arguments from config and kwargs
+        factory_args = {}
+        factory_args['implicit_wait_seconds'] = kwargs.get('implicit_wait_seconds', config.implicit_wait)
+
+        webdriver_path_kwarg = kwargs.get('webdriver_path')
+        if webdriver_path_kwarg:
+             factory_args['webdriver_path'] = webdriver_path_kwarg
+             logger.debug(f"Using provided webdriver_path: {webdriver_path_kwarg}")
+        else:
+             config_path = config.get_driver_path(browser_enum.value)
+             if config_path:
+                  factory_args['webdriver_path'] = config_path
+                  logger.debug(f"Using configured webdriver_path: {config_path}")
+
+        # Delegate creation to the factory
+        driver = self.webdriver_factory.create_driver(
+            browser_type=browser_enum,
+            driver_type=driver_type,
+            selenium_options=selenium_options,
+            playwright_options=playwright_options,
+            **factory_args
+        )
+        logger.info(f"SERVICE: Successfully created {driver_type} driver for {browser_to_use_str}.")
+        return driver
+
+    @log_method_call(logger)
     @handle_exceptions(WebDriverError, "Failed to dispose web driver")
     def dispose_web_driver(self, driver: IWebDriver) -> bool:
-        """Dispose of a web driver instance.
-        
-        Args:
-            driver: The web driver instance to dispose of
-            
-        Returns:
-            True if the web driver was disposed of successfully
-            
-        Raises:
-            WebDriverError: If there is an error disposing of the web driver
-        """
-        self.logger.info("Disposing of web driver")
-        
+        """Dispose of (quit) a web driver instance."""
+        if driver is None:
+            logger.warning("SERVICE: dispose_web_driver called with None driver.")
+            return False
+
+        logger.info(f"SERVICE: Attempting to dispose of WebDriver instance: {type(driver).__name__}")
         try:
-            # Quit the web driver
-            driver.quit()
+            driver.quit() # IWebDriver interface defines quit()
+            logger.info("SERVICE: WebDriver disposed successfully.")
             return True
         except Exception as e:
-            error_msg = f"Failed to dispose of web driver: {str(e)}"
-            self.logger.error(error_msg)
-            raise WebDriverError(error_msg) from e
+             logger.error(f"SERVICE: Error disposing WebDriver: {e}", exc_info=True)
+             raise # Let decorator wrap
+
+
+    @log_method_call(logger)
+    # No specific error handling needed here usually
+    def get_available_browser_types(self) -> List[str]:
+        """Get a list of available browser type names supported by the service/factory."""
+        # Get names from the BrowserType enum
+        available_types = [bt.value for bt in BrowserType]
+        logger.debug(f"SERVICE: Returning available browser types: {available_types}")
+        return available_types

@@ -1,163 +1,129 @@
-# AutoQliq
+# AutoQliq Application
 
 ## Overview
 
-AutoQliq is a Python-based desktop application designed to automate web tasks using Selenium/Playwright and Tkinter. The application follows SOLID, DRY, KISS, and TDD principles to ensure a robust and maintainable codebase. The core functionality is driven by external JSON configuration files for workflows and credentials, with support for both file system and database storage.
+AutoQliq is a Python-based desktop application designed to automate web tasks using Selenium and Tkinter. The application follows SOLID, DRY, and KISS principles with an MVP (Model-View-Presenter) architecture for the UI and a layered approach for backend components. The core functionality allows users to create, edit, save, and run automated web workflows. Persistence can be configured to use either JSON files or an SQLite database. Control flow (conditionals, loops), error handling (try/catch), and action templates are supported.
 
 ## Project Structure
 
 ```
-AUTOCLICK/
-├── requirements.txt              # Lists Python package dependencies
-├── README.md                     # Project documentation and usage instructions
-├── credentials.json              # Stores user credentials (unencrypted)
-├── workflows/                    # Directory to hold workflow definition files
-│   └── example_workflow.json     # Example workflow definition based on core example
+AutoQliq/
+├── requirements.txt              # Python package dependencies
+├── config.ini                    # Application configuration settings
+├── README.md                     # This file
+├── credentials.json              # Example credential file (if using file_system repo)
+├── workflows/                    # Example workflow directory (if using file_system repo)
+│   └── example_workflow.json     # Example workflow definition
+├── templates/                    # Example template directory (if using file_system repo)
+│   └── example_template.json   # Example template definition
+├── logs/                         # Directory where execution logs are saved (JSON format)
+├── autoqliq_data.db              # Example database file (if using database repo)
 ├── src/
-│   ├── __init__.py               # Marks 'src' as a Python package
-│   ├── core/
-│   │   ├── __init__.py           # Marks 'core' as a Python package
-│   │   ├── interfaces.py         # Defines core business logic interfaces (IWebDriver, IAction, Repositories)
-│   │   ├── credentials.py        # Defines the Credential data structure (e.g., dataclass)
-│   │   ├── exceptions.py         # Defines custom application exceptions (LoginFailedError etc.)
-│   │   ├── actions.py            # Implements concrete Action classes and the ActionFactory
-│   │   └── workflow.py           # Implements the WorkflowRunner for orchestrating actions
-│   ├── infrastructure/
-│   │   ├── __init__.py           # Marks 'infrastructure' as a Python package
-│   │   ├── webdrivers.py         # Implements IWebDriver using Selenium
-│   │   └── persistence.py        # Implements Repository interfaces for file system (Credentials & Workflows)
-│   ├── application/              # Optional layer for application services (leave empty initially)
-│   │   └── __init__.py           # Marks 'application' as a Python package
-│   ├── ui/
-│   │   ├── __init__.py           # Marks 'ui' as a Python package
-│   │   ├── editor_view.py        # Implements the Tkinter View for the workflow editor
-│   │   ├── editor_presenter.py   # Implements the Presenter logic for the workflow editor
-│   │   ├── runner_view.py        # Implements the Tkinter View for the workflow runner
-│   │   └── runner_presenter.py   # Implements the Presenter logic for the workflow runner
-│   └── main_ui.py                # Main application entry point, dependency injection, starts UI loop
+│   ├── __init__.py
+│   ├── config.py                 # Loads and provides config.ini settings
+│   ├── core/                     # Core domain logic and interfaces
+│   │   ├── interfaces/           # Core interfaces (Action, Repository, WebDriver, Service)
+│   │   ├── actions/              # Concrete Action implementations (incl. Conditional, Loop, ErrorHandling, Template)
+│   │   ├── workflow/             # Workflow execution logic (Runner)
+│   │   ├── exceptions.py         # Custom application exceptions
+│   │   └── action_result.py      # ActionResult class
+│   ├── infrastructure/           # Implementation of external concerns
+│   │   ├── common/               # Shared utilities
+│   │   ├── repositories/         # Persistence implementations (FS, DB for Workflows, Credentials, Templates)
+│   │   └── webdrivers/           # WebDriver implementations (Selenium)
+│   ├── application/              # Application service layer
+│   │   ├── services/             # Service implementations (Credential, Workflow, WebDriver, Scheduler[stub], Reporting[basic])
+│   │   └── interfaces/           # Deprecated - imports from core.interfaces.service
+│   ├── ui/                       # User Interface (Tkinter MVP)
+│   │   ├── common/               # Common UI utilities
+│   │   ├── dialogs/              # Custom dialog windows (ActionEditor, CredentialManager)
+│   │   ├── interfaces/           # UI layer interfaces (IView, IPresenter)
+│   │   ├── presenters/           # Presenter implementations (Editor, Runner, Settings)
+│   │   └── views/                # View implementations (Editor, Runner, Settings)
+│   └── main_ui.py                # Main application entry point, DI, starts UI loop
 └── tests/
-    ├── __init__.py               # Marks 'tests' as a Python package
-    ├── unit/
-    │   ├── __init__.py           # Marks 'unit' tests subpackage
-    │   ├── core/
-    │   │   ├── __init__.py       # Marks 'core' unit tests subpackage
-    │   │   ├── test_actions.py   # Unit tests for Action classes and Factory
-    │   │   └── test_workflow.py  # Unit tests for WorkflowRunner
-    │   ├── infrastructure/
-    │   │   ├── __init__.py       # Marks 'infrastructure' unit tests subpackage
-    │   │   └── test_persistence.py # Unit tests for Repository implementations
-    │   ├── ui/
-    │   │   ├── __init__.py       # Marks 'ui' unit tests subpackage
-    │   │   ├── test_editor_presenter.py # Unit tests for editor presenter logic
-    │   │   └── test_runner_presenter.py # Unit tests for runner presenter logic
-    └── integration/              # Integration tests (leave empty initially)
-        └── __init__.py           # Marks 'integration' tests subpackage
+    ├── __init__.py
+    ├── unit/                     # Unit tests (mock external dependencies)
+    │   ├── application/          # Tests for application services
+    │   ├── core/                 # Tests for core actions, runner
+    │   ├── infrastructure/       # Tests for repositories (FS, DB with mocks)
+    │   └── ui/                   # Tests for presenters
+    └── integration/              # Integration tests (interact with real DB/WebDriver/FS)
+        ├── __init__.py
+        ├── test_database_repository_integration.py
+        ├── test_webdriver_integration.py
+        ├── test_service_repository_integration.py # New
+        └── test_workflow_execution.py             # Placeholder
+
 ```
+
+## Configuration (`config.ini`)
+
+Application behavior is configured via `config.ini`. Key settings:
+
+-   `[Repository] type`: `file_system` or `database`.
+-   `[Repository] paths`: Set `workflows_path`, `credentials_path`, `db_path` as needed for the chosen type. Templates use a `templates` subdir relative to `workflows_path` (FS) or a `templates` table (DB).
+-   `[WebDriver] default_browser`: `chrome`, `firefox`, `edge`, `safari`.
+-   `[WebDriver] *_driver_path`: Optional explicit paths to WebDriver executables.
+-   `[WebDriver] implicit_wait`: Default implicit wait time (seconds).
+-   `[Security]`: Configure password hashing method and salt length (requires `werkzeug`).
+
+A default `config.ini` is created if missing. Settings can be modified via the "Settings" tab in the UI.
 
 ## Installation
 
-1. Clone the repository:
-
-   ```sh
-   git clone https://github.com/githubnext/workspace-blank.git
-   cd workspace-blank
-   ```
-
-2. Install the required dependencies:
-   ```sh
-   pip install -r requirements.txt
-   ```
+1.  Clone the repository.
+2.  Create/activate a Python virtual environment (`>=3.8` recommended).
+3.  Install dependencies: `pip install -r requirements.txt`
+4.  Install necessary WebDriver executables (e.g., `chromedriver`) if not using Selenium Manager or if specifying explicit paths in `config.ini`.
 
 ## Usage
 
-1. Prepare your `credentials.json` file in the root directory with the following format:
+1.  **Configure `config.ini`** (or use defaults/Settings tab).
+2.  **Manage Credentials**: Use the "Manage" -> "Credentials..." menu item. Passwords are hashed on save. **Note:** Existing plaintext passwords need re-saving via UI.
+3.  **Manage Workflows/Templates**: Use the "Workflow Editor" tab.
+    *   Create/Edit/Delete workflows.
+    *   Save reusable sequences as templates (currently requires manual file/DB operation - UI needed).
+    *   Use the `TemplateAction` type in the Action Editor to reference a saved template by name.
+4.  **Run Workflows**: Use the "Workflow Runner" tab. Select workflow/credential, click "Run". Execution is backgrounded; logs appear. Use "Stop" to request cancellation.
+5.  **Manage Settings**: Use the "Settings" tab to view/modify configuration. Click "Save Settings" to persist changes.
+6.  **Execution Logs**: Basic execution logs (status, duration, results) are saved as JSON files in the `logs/` directory.
 
-   ```json
-   [
-     {
-       "name": "example_login",
-       "username": "user@example.com",
-       "password": "password123"
-     }
-   ]
-   ```
+## Workflow Action Types
 
-2. Create your workflow JSON files in the `workflows/` directory. Example:
+Workflows are lists of action dictionaries. Supported `type` values:
 
-   ```json
-   [
-     { "type": "Navigate", "url": "https://login.example.com" },
-     {
-       "type": "Type",
-       "selector": "#username-input",
-       "value_type": "credential",
-       "value_key": "example_login.username"
-     },
-     {
-       "type": "Click",
-       "selector": "#login-button",
-       "check_success_selector": "#dashboard-title",
-       "check_failure_selector": "#login-error-message"
-     },
-     { "type": "Wait", "duration_seconds": 3 },
-     { "type": "Screenshot", "file_path": "report_screenshot.png" }
-   ]
-   ```
+*   `Navigate`: Goes to a URL (`url`).
+*   `Click`: Clicks an element (`selector`).
+*   `Type`: Types text (`value_key`) based on `value_type` ('text' or 'credential') into an element (`selector`).
+*   `Wait`: Pauses execution (`duration_seconds`).
+*   `Screenshot`: Takes a screenshot (`file_path`).
+*   `Conditional`: Executes actions based on a condition.
+    *   `condition_type`: 'element_present', 'element_not_present', 'variable_equals', 'javascript_eval'.
+    *   Requires parameters like `selector`, `variable_name`, `expected_value`, `script` based on `condition_type`.
+    *   `true_branch`: List of actions if condition is true.
+    *   `false_branch`: List of actions if condition is false.
+*   `Loop`: Repeats actions.
+    *   `loop_type`: 'count', 'for_each', 'while'.
+    *   Requires parameters like `count`, `list_variable_name`, or condition parameters based on `loop_type`.
+    *   `loop_actions`: List of actions to repeat. Context variables `loop_index`, `loop_iteration`, `loop_total`, `loop_item` are available to nested actions.
+*   `ErrorHandling`: Executes 'try' actions, runs 'catch' actions on failure.
+    *   `try_actions`: List of actions to attempt.
+    *   `catch_actions`: List of actions to run if try block fails. Context variables `try_block_error_message`, `try_block_error_type` available in catch.
+*   `Template`: Executes a saved template.
+    *   `template_name`: The name of the saved template to execute.
 
-3. Configure the application by editing `config.ini` (see Configuration section below)
-
-4. Run the application:
-   ```sh
-   python src/main_ui.py
-   ```
-
-## Configuration
-
-AutoQliq uses a configuration file (`config.ini`) to manage settings. Key configuration options include:
-
-- Repository type (file_system or database)
-- File paths for credentials and workflows
-- Logging settings
-- UI preferences
-
-Example configuration:
-
-```ini
-[repositories]
-type = file_system
-credentials_path = credentials.json
-workflows_path = workflows
-
-[logging]
-level = INFO
-file = autoqliq_app.log
-
-[ui]
-window_title = AutoQliq v0.1
-window_geometry = 900x650
-```
-
-## Security
-
-AutoQliq uses password hashing (via werkzeug.security) to securely store credentials. Passwords are never stored in plain text.
+*(See `ActionEditorDialog` or action class docstrings for specific parameters)*
 
 ## Testing
 
-1. Run unit tests:
-
-   ```sh
-   pytest tests/unit
-   ```
-
-2. Run integration tests:
-   ```sh
-   pytest tests/integration
-   ```
+-   **Unit Tests:** `pytest tests/unit`
+-   **Integration Tests:** `pytest tests/integration` (Requires WebDriver setup, uses in-memory DB)
 
 ## Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Contributions welcome!
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License.

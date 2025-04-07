@@ -1,16 +1,29 @@
 """Application service interfaces for AutoQliq.
 
-This package defines the interfaces for application services that coordinate between
-the core domain and infrastructure layers, implementing application-specific use cases.
+DEPRECATED: Interfaces are now defined in src.core.interfaces.service.py
+This package remains for backward compatibility.
 """
+import warnings
 
-# Re-export all interfaces for backward compatibility
-from src.application.interfaces.workflow_service import IWorkflowService
-from src.application.interfaces.credential_service import ICredentialService
-from src.application.interfaces.webdriver_service import IWebDriverService
+# Re-export from the new location
+from src.core.interfaces.service import (
+    IService, IWorkflowService, ICredentialService, IWebDriverService,
+    ISchedulerService, IReportingService # Include new ones
+)
+
 
 __all__ = [
+    "IService",
     "IWorkflowService",
     "ICredentialService",
     "IWebDriverService",
+    "ISchedulerService",
+    "IReportingService",
 ]
+
+warnings.warn(
+    "Importing from src.application.interfaces is deprecated. "
+    "Import service interfaces from src.core.interfaces.service instead.",
+    DeprecationWarning,
+    stacklevel=2
+)

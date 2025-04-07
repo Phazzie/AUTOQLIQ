@@ -1,13 +1,15 @@
 """Database workflow repository implementation for AutoQliq."""
 import json
 import logging
+import sqlite3 # Import sqlite3 for specific DB errors if needed
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-# Core interfaces, exceptions, and common utilities
-from src.core.interfaces.repository import IWorkflowRepository
-from src.core.interfaces.action import IAction
+# Core dependencies
+from src.core.interfaces import IAction, IWorkflowRepository
 from src.core.exceptions import WorkflowError, RepositoryError, SerializationError, ValidationError
+
+# Infrastructure dependencies
 from src.infrastructure.common.error_handling import handle_exceptions
 from src.infrastructure.common.logging_utils import log_method_call
 from src.infrastructure.common.validators import WorkflowValidator
@@ -21,201 +23,182 @@ logger = logging.getLogger(__name__)
 
 class DatabaseWorkflowRepository(DatabaseRepository[List[IAction]], IWorkflowRepository):
     """
-    Implementation of IWorkflowRepository storing workflows in an SQLite database.
-
-    Stores workflow actions as a JSON string in a dedicated column.
-
-    Attributes:
-        db_path (str): Path to the SQLite database file.
-        table_name (str): Name of the workflows table ("workflows").
+    Implementation of IWorkflowRepository storing workflows and templates in SQLite.
     """
-    _TABLE_NAME = "workflows"
-    _PK_COLUMN = "name" # Primary key column name
+    _WF_TABLE_NAME = "workflows"
+    _WF_PK_COLUMN = "name"
+    _TMPL_TABLE_NAME = "templates"
+    _TMPL_PK_COLUMN = "name"
 
     def __init__(self, db_path: str, **options: Any):
-        """
-        Initialize a new DatabaseWorkflowRepository.
+        """Initialize DatabaseWorkflowRepository."""
+        super().__init__(db_path=db_path, table_name=self._WF_TABLE_NAME, logger_name=__name__)
+        self._create_templates_table_if_not_exists()
 
-        Args:
-            db_path (str): Path to the SQLite database file.
-            **options (Any): Additional options (currently unused).
-        """
-        super().__init__(db_path=db_path, table_name=self._TABLE_NAME, logger_name=__name__)
-        # Base class constructor calls _create_table_if_not_exists -> _get_table_creation_sql
-
-    def _get_primary_key_col(self) -> str:
-        """Return the primary key column name for this repository."""
-        return self._PK_COLUMN
-
+    # --- Configuration for Workflows Table (via Base Class) ---
+    def _get_primary_key_col(self) -> str: return self._WF_PK_COLUMN
     def _get_table_creation_sql(self) -> str:
-        """Return the SQL for creating the workflows table columns."""
-        # Store actions as JSON text
-        return f"""
-            {self._PK_COLUMN} TEXT PRIMARY KEY NOT NULL,
-            actions_json TEXT NOT NULL,
-            created_at TEXT NOT NULL,
-            modified_at TEXT NOT NULL
-        """
+        return f"{self._WF_PK_COLUMN} TEXT PRIMARY KEY NOT NULL, actions_json TEXT NOT NULL, created_at TEXT NOT NULL, modified_at TEXT NOT NULL"
 
+    # --- Configuration and Creation for Templates Table ---
+    def _get_templates_table_creation_sql(self) -> str:
+         """Return SQL for creating the templates table."""
+         # Added modified_at for templates as well
+         return f"{self._TMPL_PK_COLUMN} TEXT PRIMARY KEY NOT NULL, actions_json TEXT NOT NULL, created_at TEXT NOT NULL, modified_at TEXT NOT NULL"
+
+    def _create_templates_table_if_not_exists(self) -> None:
+        """Create the templates table."""
+        logger.debug("Ensuring templates table exists.")
+        sql = self._get_templates_table_creation_sql()
+        try: self.connection_manager.create_table(self._TMPL_TABLE_NAME, sql)
+        except Exception as e: logger.error(f"Failed ensure table '{self._TMPL_TABLE_NAME}': {e}", exc_info=True)
+
+
+    # --- Mapping for Workflows (Base Class uses these) ---
     def _map_row_to_entity(self, row: Dict[str, Any]) -> List[IAction]:
-        """Convert a database row (containing actions JSON) to a list of IAction."""
-        actions_json = row.get("actions_json")
-        workflow_name = row.get(self._PK_COLUMN, "<unknown>") # For error context
-        if actions_json is None:
-            # Should not happen if column is NOT NULL, but handle defensively
-            self.logger.error(f"Missing 'actions_json' data for workflow '{workflow_name}'.")
-            raise RepositoryError(f"Missing action data for workflow '{workflow_name}'.", entity_id=workflow_name)
-
+        """Convert a workflow table row to a list of IAction."""
+        actions_json = row.get("actions_json"); name = row.get(self._WF_PK_COLUMN, "<unknown>")
+        if actions_json is None: raise RepositoryError(f"Missing action data for workflow '{name}'.", entity_id=name)
         try:
-            # Deserialize the JSON string into a list of action dictionaries
             action_data_list = json.loads(actions_json)
-            if not isinstance(action_data_list, list):
-                 raise json.JSONDecodeError(f"Stored actions data is not a JSON list, type is {type(action_data_list).__name__}.", actions_json, 0)
-            # Deserialize the list of dictionaries into IAction objects
-            return deserialize_actions(action_data_list) # Raises SerializationError on failure
-        except json.JSONDecodeError as e:
-            error_msg = f"Invalid JSON format in actions data for workflow '{workflow_name}': {e}"
-            self.logger.error(error_msg)
-            raise SerializationError(error_msg, cause=e) from e
-        except SerializationError as e:
-            # Error during action deserialization (e.g., unknown type)
-            error_msg = f"Failed to deserialize actions for workflow '{workflow_name}': {e}"
-            self.logger.error(error_msg)
-            # Re-raise as SerializationError or wrap in RepositoryError? Stick with SerializationError.
-            raise SerializationError(error_msg, cause=e.cause or e) from e
+            if not isinstance(action_data_list, list): raise json.JSONDecodeError("Not JSON list.", actions_json, 0)
+            return deserialize_actions(action_data_list) # Raises SerializationError
+        except json.JSONDecodeError as e: raise SerializationError(f"Invalid JSON in workflow '{name}': {e}", entity_id=name, cause=e) from e
         except Exception as e:
-             # Catch any other unexpected error during deserialization
-             error_msg = f"Unexpected error processing actions for workflow '{workflow_name}': {e}"
-             self.logger.error(error_msg, exc_info=True)
-             raise RepositoryError(error_msg, entity_id=workflow_name, cause=e) from e
-
+             if isinstance(e, SerializationError): raise
+             raise RepositoryError(f"Error processing actions for workflow '{name}': {e}", entity_id=name, cause=e) from e
 
     def _map_entity_to_params(self, entity_id: str, entity: List[IAction]) -> Dict[str, Any]:
-        """Convert a list of IAction into database parameters, serializing actions to JSON."""
-        # Validate workflow name (entity_id) and actions list
-        WorkflowValidator.validate_workflow_name(entity_id) # Raises ValidationError
-        WorkflowValidator.validate_actions(entity) # Raises ValidationError
-
+        """Convert list of IAction to workflow DB parameters."""
+        WorkflowValidator.validate_workflow_name(entity_id)
+        WorkflowValidator.validate_actions(entity)
         try:
-            # Serialize the list of actions into a list of dictionaries
             action_data_list = serialize_actions(entity) # Raises SerializationError
-            # Convert the list of dictionaries to a JSON string
             actions_json = json.dumps(action_data_list)
-        except SerializationError as e:
-             # Error during action serialization
-             error_msg = f"Failed to serialize actions for workflow '{entity_id}': {e}"
-             self.logger.error(error_msg)
-             raise SerializationError(error_msg, cause=e.cause or e) from e
-        except TypeError as e: # Catch json.dumps errors
-             error_msg = f"Data for workflow '{entity_id}' is not JSON serializable: {e}"
-             self.logger.error(error_msg, exc_info=True)
-             raise SerializationError(error_msg, cause=e) from e
-        except Exception as e:
-             # Catch other unexpected errors
-             error_msg = f"Unexpected error serializing actions for workflow '{entity_id}': {e}"
-             self.logger.error(error_msg, exc_info=True)
-             raise SerializationError(error_msg, cause=e) from e
-
+        except (SerializationError, TypeError) as e: raise SerializationError(f"Failed serialize actions for workflow '{entity_id}'", entity_id=entity_id, cause=e) from e
         now = datetime.now().isoformat()
-        return {
-            self._PK_COLUMN: entity_id,
-            "actions_json": actions_json,
-            "created_at": now, # Ignored on UPDATE by base class UPSERT logic
-            "modified_at": now # Base class UPSERT uses this
-        }
+        return { self._WF_PK_COLUMN: entity_id, "actions_json": actions_json, "created_at": now, "modified_at": now }
 
-    # --- IWorkflowRepository Method Implementations ---
+    # --- IWorkflowRepository Implementation (using Base Class methods) ---
+    @log_method_call(logger)
+    @handle_exceptions(WorkflowError, "Error saving workflow", reraise_types=(WorkflowError, ValidationError, RepositoryError, SerializationError))
+    def save(self, name: str, workflow_actions: List[IAction]) -> None: super().save(name, workflow_actions)
 
     @log_method_call(logger)
-    @handle_exceptions(WorkflowError, "Error saving workflow", reraise_types=(WorkflowError, RepositoryError, SerializationError, ValidationError))
-    def save(self, name: str, workflow_actions: List[IAction]) -> None:
-        """Save (create or update) a workflow."""
-        # Validation happens in _map_entity_to_params called by base save
-        super().save(name, workflow_actions) # Uses base DatabaseRepository.save
-
-    @log_method_call(logger)
-    @handle_exceptions(WorkflowError, "Error loading workflow", reraise_types=(WorkflowError, RepositoryError, SerializationError, ValidationError))
+    @handle_exceptions(WorkflowError, "Error loading workflow", reraise_types=(WorkflowError, ValidationError, RepositoryError, SerializationError))
     def load(self, name: str) -> List[IAction]:
-        """Load a workflow by its unique name."""
-        # Base class get handles retrieval and calls _map_row_to_entity for deserialization
-        actions = super().get(name) # Uses base DatabaseRepository.get
-        if actions is None:
-             raise WorkflowError(f"Workflow not found: '{name}'", workflow_name=name)
+        actions = super().get(name)
+        if actions is None: raise RepositoryError(f"Workflow not found: '{name}'", entity_id=name)
         return actions
 
     @log_method_call(logger)
-    @handle_exceptions(WorkflowError, "Error deleting workflow", reraise_types=(WorkflowError, RepositoryError, ValidationError))
-    def delete(self, name: str) -> bool:
-        """Delete a workflow by its name."""
-        # Uses base DatabaseRepository.delete
-        return super().delete(name)
+    @handle_exceptions(WorkflowError, "Error deleting workflow", reraise_types=(WorkflowError, ValidationError, RepositoryError))
+    def delete(self, name: str) -> bool: return super().delete(name)
 
     @log_method_call(logger)
-    @handle_exceptions(WorkflowError, "Error listing workflows", reraise_types=(WorkflowError, RepositoryError))
-    def list_workflows(self) -> List[str]:
-        """List the names of all stored workflows."""
-         # Uses base DatabaseRepository.list
-        return super().list()
+    @handle_exceptions(WorkflowError, "Error listing workflows", reraise_types=(RepositoryError,))
+    def list_workflows(self) -> List[str]: return super().list()
 
     @log_method_call(logger)
-    @handle_exceptions(WorkflowError, "Error getting workflow metadata", reraise_types=(WorkflowError, RepositoryError, ValidationError))
+    @handle_exceptions(WorkflowError, "Error getting workflow metadata", reraise_types=(WorkflowError, ValidationError, RepositoryError))
     def get_metadata(self, name: str) -> Dict[str, Any]:
-        """Get metadata for a workflow (e.g., creation/modification times)."""
-        self._validate_entity_id(name, entity_type="Workflow") # Raises ValidationError
+        self._validate_entity_id(name, entity_type="Workflow")
         self._log_operation("Getting metadata", name)
         try:
-            # Select metadata columns
-            query = f"SELECT {self._PK_COLUMN}, created_at, modified_at FROM {self.table_name} WHERE {self._PK_COLUMN} = ?"
+            query = f"SELECT {self._WF_PK_COLUMN}, created_at, modified_at FROM {self._WF_TABLE_NAME} WHERE {self._WF_PK_COLUMN} = ?"
             rows = self.connection_manager.execute_query(query, (name,))
-
-            if not rows:
-                raise WorkflowError(f"Workflow not found: '{name}'", workflow_name=name)
-
-            metadata = dict(rows[0])
-            self.logger.debug(f"Successfully retrieved metadata for workflow: '{name}'")
+            if not rows: raise RepositoryError(f"Workflow not found: {name}", entity_id=name)
+            metadata = dict(rows[0]); metadata["source"] = "database"
             return metadata
-        except RepositoryError as e:
-             # Error during query execution
-             raise WorkflowError(f"Database error getting metadata for workflow '{name}'", workflow_name=name, cause=e.cause) from e
-        except Exception as e:
-            # Catch other unexpected errors
-            error_msg = f"Failed to get metadata for workflow: '{name}'"
-            self.logger.error(error_msg, exc_info=True)
-            # Don't raise RepositoryError directly if WorkflowError is more appropriate
-            if isinstance(e, WorkflowError): raise
-            raise WorkflowError(error_msg, workflow_name=name, cause=e) from e
+        except RepositoryError: raise
+        except Exception as e: raise RepositoryError(f"Failed get metadata for workflow '{name}'", entity_id=name, cause=e) from e
 
     @log_method_call(logger)
-    @handle_exceptions(WorkflowError, "Error creating empty workflow", reraise_types=(WorkflowError, RepositoryError, ValidationError))
+    @handle_exceptions(WorkflowError, "Error creating empty workflow", reraise_types=(WorkflowError, ValidationError, RepositoryError))
     def create_workflow(self, name: str) -> None:
-        """Create a new, empty workflow entry."""
-        self._validate_entity_id(name, entity_type="Workflow") # Raises ValidationError
+        WorkflowValidator.validate_workflow_name(name)
         self._log_operation("Creating empty workflow", name)
+        if super().get(name) is not None: raise RepositoryError(f"Workflow '{name}' already exists.", entity_id=name)
+        try: super().save(name, []) # Save empty list
+        except Exception as e: raise WorkflowError(f"Failed create empty workflow '{name}'", workflow_name=name, cause=e) from e
 
-        # Check if it already exists first to provide a clearer error
-        # Need to use get() carefully to avoid raising WorkflowError if not found
+    # --- Template Methods (DB Implementation) ---
+
+    @log_method_call(logger)
+    @handle_exceptions(RepositoryError, "Error saving template", reraise_types=(ValidationError, RepositoryError, SerializationError))
+    def save_template(self, name: str, actions_data: List[Dict[str, Any]]) -> None:
+        """Save/Update an action template (serialized list) to the DB."""
+        self._validate_entity_id(name, entity_type="Template") # Use base validator
+        self._log_operation("Saving template", name)
+        if not isinstance(actions_data, list) or not all(isinstance(item, dict) for item in actions_data):
+             raise SerializationError("Template actions data must be list of dicts.")
+        try: actions_json = json.dumps(actions_data)
+        except TypeError as e: raise SerializationError(f"Data for template '{name}' not JSON serializable", entity_id=name, cause=e) from e
+
+        now = datetime.now().isoformat()
+        pk_col = self._TMPL_PK_COLUMN
+        # Include modified_at for templates table as well
+        params = {pk_col: name, "actions_json": actions_json, "created_at": now, "modified_at": now}
+        columns = list(params.keys()); placeholders = ", ".join("?" * len(params))
+        # Update actions_json and modified_at on conflict
+        update_cols = ["actions_json", "modified_at"]
+        updates = ", ".join(f"{col} = ?" for col in update_cols)
+        query = f"""
+            INSERT INTO {self._TMPL_TABLE_NAME} ({', '.join(columns)}) VALUES ({placeholders})
+            ON CONFLICT({pk_col}) DO UPDATE SET {updates}
+        """
+        # Values: name, json, created, modified, json_update, modified_update
+        final_params = (name, actions_json, now, now, actions_json, now)
         try:
-            existing = super().get(name) # Use base get which returns None if not found
-            if existing is not None:
-                raise WorkflowError(f"Workflow '{name}' already exists.", workflow_name=name)
-        except RepositoryError as e:
-             # Handle potential DB error during the check
-             raise WorkflowError(f"Error checking existence of workflow '{name}'", workflow_name=name, cause=e.cause) from e
+            self.connection_manager.execute_modification(query, final_params)
+            self.logger.info(f"Successfully saved template: '{name}'")
+        except Exception as e: raise RepositoryError(f"DB error saving template '{name}'", entity_id=name, cause=e) from e
 
 
+    @log_method_call(logger)
+    @handle_exceptions(RepositoryError, "Error loading template", reraise_types=(ValidationError, RepositoryError, SerializationError))
+    def load_template(self, name: str) -> List[Dict[str, Any]]:
+        """Load serialized action data for a template from the DB."""
+        self._validate_entity_id(name, entity_type="Template")
+        self._log_operation("Loading template", name)
+        query = f"SELECT actions_json FROM {self._TMPL_TABLE_NAME} WHERE {self._TMPL_PK_COLUMN} = ?"
         try:
-            # Save with an empty list of actions. Use base save which calls _map_entity_to_params.
-            super().save(name, [])
-            self.logger.info(f"Successfully created empty workflow: '{name}'")
-        except (RepositoryError, SerializationError, ValidationError) as e:
-             # Catch potential errors from save() -> _map_entity_to_params -> validation/serialization
-             error_msg = f"Failed to create empty workflow '{name}': {e}"
-             # Log details if not already logged by save() or helpers
-             self.logger.error(error_msg, exc_info=True)
-             # Re-raise wrapped error
-             raise WorkflowError(error_msg, workflow_name=name, cause=e) from e
-        except Exception as e:
-             # Catch other unexpected errors
-             error_msg = f"Unexpected error creating empty workflow '{name}': {e}"
-             self.logger.error(error_msg, exc_info=True)
-             raise WorkflowError(error_msg, workflow_name=name, cause=e) from e
+            rows = self.connection_manager.execute_query(query, (name,))
+            if not rows: raise RepositoryError(f"Template not found: {name}", entity_id=name)
+            actions_json = rows[0]["actions_json"]
+            actions_data = json.loads(actions_json) # Raises JSONDecodeError
+            if not isinstance(actions_data, list): raise SerializationError(f"Stored template '{name}' not JSON list.", entity_id=name)
+            if not all(isinstance(item, dict) for item in actions_data): raise SerializationError(f"Stored template '{name}' contains non-dict items.", entity_id=name)
+            return actions_data
+        except RepositoryError: raise
+        except json.JSONDecodeError as e: raise SerializationError(f"Invalid JSON in template '{name}'", entity_id=name, cause=e) from e
+        except Exception as e: raise RepositoryError(f"DB error loading template '{name}'", entity_id=name, cause=e) from e
+
+
+    @log_method_call(logger)
+    @handle_exceptions(RepositoryError, "Error deleting template", reraise_types=(ValidationError, RepositoryError))
+    def delete_template(self, name: str) -> bool:
+        """Delete a template from the DB."""
+        self._validate_entity_id(name, entity_type="Template")
+        self._log_operation("Deleting template", name)
+        query = f"DELETE FROM {self._TMPL_TABLE_NAME} WHERE {self._TMPL_PK_COLUMN} = ?"
+        try:
+            affected_rows = self.connection_manager.execute_modification(query, (name,))
+            deleted = affected_rows > 0
+            if deleted: self.logger.info(f"Successfully deleted template: '{name}'")
+            else: self.logger.warning(f"Template not found for deletion: '{name}'")
+            return deleted
+        except Exception as e: raise RepositoryError(f"DB error deleting template '{name}'", entity_id=name, cause=e) from e
+
+
+    @log_method_call(logger)
+    @handle_exceptions(RepositoryError, "Error listing templates")
+    def list_templates(self) -> List[str]:
+        """List the names of all saved templates."""
+        self._log_operation("Listing templates")
+        query = f"SELECT {self._TMPL_PK_COLUMN} FROM {self._TMPL_TABLE_NAME} ORDER BY {self._TMPL_PK_COLUMN}"
+        try:
+            rows = self.connection_manager.execute_query(query)
+            names = [row[self._TMPL_PK_COLUMN] for row in rows]
+            return names
+        except Exception as e: raise RepositoryError(f"DB error listing templates", cause=e) from e

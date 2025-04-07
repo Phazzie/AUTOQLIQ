@@ -1,590 +1,320 @@
-"""Workflow editor view module for AutoQliq.
-
-This module provides the view component for the workflow editor.
-"""
+"""Workflow editor view implementation for AutoQliq."""
 
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox
 import logging
-from typing import Dict, Any, Optional, List
+from typing import List, Dict, Any, Optional
 
+# Core / Infrastructure
 from src.core.exceptions import UIError
 
+# UI elements
+from src.ui.interfaces.presenter import IWorkflowEditorPresenter
+from src.ui.interfaces.view import IWorkflowEditorView
+from src.ui.views.base_view import BaseView
+from src.ui.common.ui_factory import UIFactory
+# Import the new dialog
+from src.ui.dialogs.action_editor_dialog import ActionEditorDialog
 
-class WorkflowEditorView:
+
+class WorkflowEditorView(BaseView, IWorkflowEditorView):
     """
-    View component for the workflow editor.
-
-    This class provides the UI for creating, editing, and managing workflows.
-    It communicates with a presenter to handle business logic.
-
-    Attributes:
-        root: The root Tkinter window
-        presenter: The presenter that handles business logic
-        main_frame: The main frame containing all widgets
-        workflow_listbox: Listbox displaying available workflows
-        action_listbox: Listbox displaying actions in the selected workflow
-        logger: Logger for recording view operations and errors
+    View component for the workflow editor. Displays workflows and actions,
+    and forwards user interactions to the WorkflowEditorPresenter.
+    Uses ActionEditorDialog for adding/editing actions.
     """
 
-    def __init__(self, root: tk.Tk, presenter: Any):
+    def __init__(self, root: tk.Widget, presenter: IWorkflowEditorPresenter):
         """
-        Initialize a new WorkflowEditorView.
+        Initialize the workflow editor view.
 
         Args:
-            root: The root Tkinter window
-            presenter: The presenter that handles business logic
-
-        Raises:
-            UIError: If the view cannot be initialized
+            root: The parent widget (e.g., a frame in a notebook).
+            presenter: The presenter handling the logic for this view.
         """
-        self.root = root
-        self.presenter = presenter
-        self.logger = logging.getLogger(__name__)
-        
+        super().__init__(root, presenter)
+        self.presenter: IWorkflowEditorPresenter # Type hint
+
+        # Widgets specific to this view
+        self.workflow_list_widget: Optional[tk.Listbox] = None
+        self.action_list_widget: Optional[tk.Listbox] = None
+        self.new_button: Optional[ttk.Button] = None
+        self.save_button: Optional[ttk.Button] = None
+        self.delete_button: Optional[ttk.Button] = None
+        self.add_action_button: Optional[ttk.Button] = None
+        self.edit_action_button: Optional[ttk.Button] = None
+        self.delete_action_button: Optional[ttk.Button] = None
+
         try:
-            # Create the main frame
-            self.main_frame = ttk.Frame(self.root, padding="10")
-            self.main_frame.pack(fill=tk.BOTH, expand=True)
-            
-            # Create widgets
-            self.create_widgets()
-            
-            # Populate the workflow list
-            self.populate_workflow_list()
-            
-            self.logger.debug("WorkflowEditorView initialized")
+            self._create_widgets()
+            self.logger.info("WorkflowEditorView initialized successfully.")
         except Exception as e:
-            error_msg = "Failed to initialize WorkflowEditorView"
-            self.logger.error(error_msg, exc_info=True)
-            raise UIError(error_msg, component_name="WorkflowEditorView", cause=e)
+            error_msg = "Failed to create WorkflowEditorView widgets"
+            self.logger.exception(error_msg)
+            self.display_error("Initialization Error", f"{error_msg}: {e}")
+            raise UIError(error_msg, component_name="WorkflowEditorView", cause=e) from e
 
-    def create_widgets(self) -> None:
-        """
-        Create the UI widgets.
+    def _create_widgets(self) -> None:
+        """Create the UI elements for the editor view within self.main_frame."""
+        self.logger.debug("Creating editor widgets.")
 
-        Raises:
-            UIError: If the widgets cannot be created
-        """
-        try:
-            # Create a frame for the workflow list
-            workflow_frame = ttk.LabelFrame(self.main_frame, text="Workflows")
-            workflow_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-            
-            # Create the workflow listbox
-            self.workflow_listbox = tk.Listbox(workflow_frame, height=10, width=50)
-            self.workflow_listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-            self.workflow_listbox.bind("<<ListboxSelect>>", self.on_workflow_selected)
-            
-            # Create workflow buttons
-            workflow_button_frame = ttk.Frame(workflow_frame)
-            workflow_button_frame.pack(fill=tk.X, padx=5, pady=5)
-            
-            self.new_workflow_button = ttk.Button(
-                workflow_button_frame, text="New Workflow", command=self.on_new_workflow
-            )
-            self.new_workflow_button.pack(side=tk.LEFT, padx=5)
-            
-            self.delete_workflow_button = ttk.Button(
-                workflow_button_frame, text="Delete Workflow", command=self.on_delete_workflow
-            )
-            self.delete_workflow_button.pack(side=tk.LEFT, padx=5)
-            
-            # Create a frame for the action list
-            action_frame = ttk.LabelFrame(self.main_frame, text="Actions")
-            action_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-            
-            # Create the action listbox
-            self.action_listbox = tk.Listbox(action_frame, height=10, width=50)
-            self.action_listbox.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-            
-            # Create action buttons
-            action_button_frame = ttk.Frame(action_frame)
-            action_button_frame.pack(fill=tk.X, padx=5, pady=5)
-            
-            self.add_action_button = ttk.Button(
-                action_button_frame, text="Add Action", command=self.on_add_action
-            )
-            self.add_action_button.pack(side=tk.LEFT, padx=5)
-            
-            self.edit_action_button = ttk.Button(
-                action_button_frame, text="Edit Action", command=self.on_edit_action
-            )
-            self.edit_action_button.pack(side=tk.LEFT, padx=5)
-            
-            self.delete_action_button = ttk.Button(
-                action_button_frame, text="Delete Action", command=self.on_delete_action
-            )
-            self.delete_action_button.pack(side=tk.LEFT, padx=5)
-            
-            # Create save button
-            self.save_button = ttk.Button(
-                self.main_frame, text="Save Workflow", command=self.on_save_workflow
-            )
-            self.save_button.pack(side=tk.RIGHT, padx=5, pady=5)
-            
-            self.logger.debug("Widgets created")
-        except Exception as e:
-            error_msg = "Failed to create widgets"
-            self.logger.error(error_msg, exc_info=True)
-            raise UIError(error_msg, component_name="WorkflowEditorView", cause=e)
+        # Configure grid weights for self.main_frame resizing
+        self.main_frame.rowconfigure(0, weight=1) # Lists take vertical space
+        self.main_frame.rowconfigure(1, weight=0) # Buttons fixed size
+        self.main_frame.columnconfigure(0, weight=1, minsize=200) # Workflow list column
+        self.main_frame.columnconfigure(1, weight=3, minsize=350) # Action list column
 
-    def populate_workflow_list(self) -> None:
-        """
-        Populate the workflow listbox with available workflows.
+        # --- Workflow List Section ---
+        wf_list_frame = UIFactory.create_label_frame(self.main_frame, text="Workflows")
+        wf_list_frame.grid(row=0, column=0, sticky=tk.NSEW, padx=(0, 5), pady=(0, 5))
+        wf_list_frame.rowconfigure(0, weight=1)
+        wf_list_frame.columnconfigure(0, weight=1)
 
-        Raises:
-            UIError: If the workflow list cannot be populated
-        """
-        try:
-            # Clear the listbox
-            self.workflow_listbox.delete(0, tk.END)
-            
-            # Get the list of workflows from the presenter
-            workflows = self.presenter.get_workflow_list()
-            
-            # Add each workflow to the listbox
-            for workflow in workflows:
-                self.workflow_listbox.insert(tk.END, workflow)
-                
-            self.logger.debug(f"Populated workflow list with {len(workflows)} workflows")
-        except Exception as e:
-            error_msg = "Failed to populate workflow list"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+        wf_scrolled_list = UIFactory.create_scrolled_listbox(wf_list_frame, height=15, selectmode=tk.BROWSE)
+        self.workflow_list_widget = wf_scrolled_list["listbox"]
+        wf_scrolled_list["frame"].grid(row=0, column=0, sticky=tk.NSEW)
+        self.workflow_list_widget.bind("<<ListboxSelect>>", self._on_workflow_selected)
 
-    def on_workflow_selected(self, event: tk.Event) -> None:
-        """
-        Handle workflow selection.
+        # --- Workflow Buttons Section ---
+        wf_button_frame = UIFactory.create_frame(self.main_frame, padding="5 0 0 0")
+        wf_button_frame.grid(row=1, column=0, sticky=tk.EW, padx=(0, 5))
 
-        Args:
-            event: The Tkinter event
+        self.new_button = UIFactory.create_button(wf_button_frame, text="New", command=self._on_new_workflow)
+        self.new_button.pack(side=tk.LEFT, padx=2)
 
-        Raises:
-            UIError: If there is an error loading the selected workflow
-        """
-        try:
-            # Get the selected workflow
-            workflow_name = self.get_selected_workflow()
-            if workflow_name is None:
-                return
-                
-            # Load the workflow
-            actions = self.presenter.load_workflow(workflow_name)
-            if actions is None:
-                messagebox.showerror("Error", f"Failed to load workflow: {workflow_name}")
-                return
-                
-            # Update the action listbox
-            self.update_action_list(actions)
-            
-            self.logger.debug(f"Loaded workflow: {workflow_name}")
-        except Exception as e:
-            error_msg = "Failed to load workflow"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+        self.save_button = UIFactory.create_button(wf_button_frame, text="Save", command=self._on_save_workflow, state=tk.DISABLED)
+        self.save_button.pack(side=tk.LEFT, padx=2)
 
-    def on_new_workflow(self) -> None:
-        """
-        Handle new workflow button click.
+        self.delete_button = UIFactory.create_button(wf_button_frame, text="Delete", command=self._on_delete_workflow, state=tk.DISABLED)
+        self.delete_button.pack(side=tk.LEFT, padx=2)
 
-        Raises:
-            UIError: If there is an error creating a new workflow
-        """
-        try:
-            # Prompt for workflow name
-            workflow_name = simpledialog.askstring("New Workflow", "Enter workflow name:")
-            if workflow_name is None:
-                return  # User cancelled
-                
-            # Create the workflow
-            success = self.presenter.create_workflow(workflow_name)
-            if success:
-                # Refresh the workflow list
-                self.populate_workflow_list()
-                self.logger.debug(f"Created new workflow: {workflow_name}")
-            else:
-                messagebox.showerror("Error", f"Failed to create workflow: {workflow_name}")
-        except Exception as e:
-            error_msg = "Failed to create new workflow"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+        # --- Action List Section ---
+        action_list_frame = UIFactory.create_label_frame(self.main_frame, text="Actions")
+        action_list_frame.grid(row=0, column=1, sticky=tk.NSEW, pady=(0, 5))
+        action_list_frame.rowconfigure(0, weight=1)
+        action_list_frame.columnconfigure(0, weight=1)
 
-    def on_delete_workflow(self) -> None:
-        """
-        Handle delete workflow button click.
+        action_scrolled_list = UIFactory.create_scrolled_listbox(action_list_frame, height=15, selectmode=tk.BROWSE)
+        self.action_list_widget = action_scrolled_list["listbox"]
+        action_scrolled_list["frame"].grid(row=0, column=0, sticky=tk.NSEW)
+        self.action_list_widget.bind("<<ListboxSelect>>", self._on_action_selected)
+        self.action_list_widget.bind("<Double-1>", self._on_edit_action)
 
-        Raises:
-            UIError: If there is an error deleting a workflow
-        """
-        try:
-            # Get the selected workflow
-            workflow_name = self.get_selected_workflow()
-            if workflow_name is None:
-                messagebox.showwarning("Warning", "No workflow selected")
-                return
-                
-            # Confirm deletion
-            if not messagebox.askyesno("Confirm", f"Delete workflow '{workflow_name}'?"):
-                return
-                
-            # Delete the workflow
-            success = self.presenter.delete_workflow(workflow_name)
-            if success:
-                # Refresh the workflow list
-                self.populate_workflow_list()
-                # Clear the action listbox
-                self.action_listbox.delete(0, tk.END)
-                self.logger.debug(f"Deleted workflow: {workflow_name}")
-            else:
-                messagebox.showerror("Error", f"Failed to delete workflow: {workflow_name}")
-        except Exception as e:
-            error_msg = "Failed to delete workflow"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+        # --- Action Buttons Section ---
+        action_button_frame = UIFactory.create_frame(self.main_frame, padding="5 0 0 0")
+        action_button_frame.grid(row=1, column=1, sticky=tk.EW)
 
-    def on_add_action(self) -> None:
-        """
-        Handle add action button click.
+        self.add_action_button = UIFactory.create_button(action_button_frame, text="Add Action", command=self._on_add_action, state=tk.DISABLED)
+        self.add_action_button.pack(side=tk.LEFT, padx=2)
 
-        Raises:
-            UIError: If there is an error adding an action
-        """
-        try:
-            # Get the selected workflow
-            workflow_name = self.get_selected_workflow()
-            if workflow_name is None:
-                messagebox.showwarning("Warning", "No workflow selected")
-                return
-                
-            # Show the action dialog
-            action_data = self.show_action_dialog()
-            if action_data is None:
-                return  # User cancelled
-                
-            # Add the action
-            success = self.presenter.add_action(workflow_name, action_data)
-            if success:
-                # Reload the workflow to update the action list
-                self.on_workflow_selected(None)
-                self.logger.debug(f"Added action to workflow: {workflow_name}")
-            else:
-                messagebox.showerror("Error", f"Failed to add action to workflow: {workflow_name}")
-        except Exception as e:
-            error_msg = "Failed to add action"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+        self.edit_action_button = UIFactory.create_button(action_button_frame, text="Edit Action", command=self._on_edit_action, state=tk.DISABLED)
+        self.edit_action_button.pack(side=tk.LEFT, padx=2)
 
-    def on_edit_action(self) -> None:
-        """
-        Handle edit action button click.
+        self.delete_action_button = UIFactory.create_button(action_button_frame, text="Delete Action", command=self._on_delete_action, state=tk.DISABLED)
+        self.delete_action_button.pack(side=tk.LEFT, padx=2)
 
-        Raises:
-            UIError: If there is an error editing an action
-        """
-        try:
-            # Get the selected workflow
-            workflow_name = self.get_selected_workflow()
-            if workflow_name is None:
-                messagebox.showwarning("Warning", "No workflow selected")
-                return
-                
-            # Get the selected action
-            action_index = self.get_selected_action_index()
-            if action_index is None:
-                messagebox.showwarning("Warning", "No action selected")
-                return
-                
-            # Get the current action data
-            current_action = self.presenter.get_action(workflow_name, action_index)
-            if current_action is None:
-                messagebox.showerror("Error", "Failed to get action data")
-                return
-                
-            # Show the action dialog with the current action data
-            action_data = self.show_action_dialog(current_action)
-            if action_data is None:
-                return  # User cancelled
-                
-            # Update the action
-            success = self.presenter.update_action(workflow_name, action_index, action_data)
-            if success:
-                # Reload the workflow to update the action list
-                self.on_workflow_selected(None)
-                self.logger.debug(f"Updated action in workflow: {workflow_name}")
-            else:
-                messagebox.showerror("Error", f"Failed to update action in workflow: {workflow_name}")
-        except Exception as e:
-            error_msg = "Failed to edit action"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+        self.logger.debug("Editor widgets created.")
 
-    def on_delete_action(self) -> None:
-        """
-        Handle delete action button click.
+    # --- IWorkflowEditorView Implementation ---
 
-        Raises:
-            UIError: If there is an error deleting an action
-        """
-        try:
-            # Get the selected workflow
-            workflow_name = self.get_selected_workflow()
-            if workflow_name is None:
-                messagebox.showwarning("Warning", "No workflow selected")
-                return
-                
-            # Get the selected action
-            action_index = self.get_selected_action_index()
-            if action_index is None:
-                messagebox.showwarning("Warning", "No action selected")
-                return
-                
-            # Confirm deletion
-            if not messagebox.askyesno("Confirm", "Delete selected action?"):
-                return
-                
-            # Delete the action
-            success = self.presenter.delete_action(workflow_name, action_index)
-            if success:
-                # Reload the workflow to update the action list
-                self.on_workflow_selected(None)
-                self.logger.debug(f"Deleted action from workflow: {workflow_name}")
-            else:
-                messagebox.showerror("Error", f"Failed to delete action from workflow: {workflow_name}")
-        except Exception as e:
-            error_msg = "Failed to delete action"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+    def set_workflow_list(self, workflow_names: List[str]) -> None:
+        """Populate the workflow listbox."""
+        if not self.workflow_list_widget: return
+        self.logger.debug(f"Setting workflow list with {len(workflow_names)} items.")
+        selected_name = self.get_selected_workflow_name()
+        self.workflow_list_widget.delete(0, tk.END)
+        sorted_names = sorted(workflow_names)
+        for name in sorted_names:
+            self.workflow_list_widget.insert(tk.END, name)
+        if selected_name in sorted_names:
+             try:
+                  list_items = self.workflow_list_widget.get(0, tk.END)
+                  idx = list_items.index(selected_name)
+                  self.workflow_list_widget.selection_set(idx)
+                  self.workflow_list_widget.activate(idx)
+                  self.workflow_list_widget.see(idx)
+             except (ValueError, tk.TclError): pass
+        self._update_workflow_button_states() # Update states after list changes
 
-    def on_save_workflow(self) -> None:
-        """
-        Handle save workflow button click.
 
-        Raises:
-            UIError: If there is an error saving the workflow
-        """
-        try:
-            # Get the selected workflow
-            workflow_name = self.get_selected_workflow()
-            if workflow_name is None:
-                messagebox.showwarning("Warning", "No workflow selected")
-                return
-                
-            # Save the workflow
-            success = self.presenter.save_workflow(workflow_name)
-            if success:
-                messagebox.showinfo("Success", f"Workflow '{workflow_name}' saved successfully")
-                self.logger.debug(f"Saved workflow: {workflow_name}")
-            else:
-                messagebox.showerror("Error", f"Failed to save workflow: {workflow_name}")
-        except Exception as e:
-            error_msg = "Failed to save workflow"
-            self.logger.error(error_msg, exc_info=True)
-            messagebox.showerror("Error", f"{error_msg}: {str(e)}")
+    def set_action_list(self, actions_display: List[str]) -> None:
+        """Display the actions for the current workflow."""
+        if not self.action_list_widget: return
+        self.logger.debug(f"Setting action list with {len(actions_display)} items.")
+        selected_index = self.get_selected_action_index()
+        self.action_list_widget.delete(0, tk.END)
+        for display_text in actions_display:
+            self.action_list_widget.insert(tk.END, display_text)
+        if selected_index is not None and selected_index < len(actions_display):
+             try:
+                  self.action_list_widget.selection_set(selected_index)
+                  self.action_list_widget.activate(selected_index)
+                  self.action_list_widget.see(selected_index)
+             except tk.TclError: pass
+        self._update_action_button_states() # Update states after list changes
 
-    def get_selected_workflow(self) -> Optional[str]:
-        """
-        Get the name of the selected workflow.
-
-        Returns:
-            The name of the selected workflow, or None if no workflow is selected
-        """
-        selected_indices = self.workflow_listbox.curselection()
-        if not selected_indices:
-            return None
-            
-        return self.workflow_listbox.get(selected_indices[0])
+    def get_selected_workflow_name(self) -> Optional[str]:
+        """Get the name of the currently selected workflow."""
+        if not self.workflow_list_widget: return None
+        selection_indices = self.workflow_list_widget.curselection()
+        return self.workflow_list_widget.get(selection_indices[0]) if selection_indices else None
 
     def get_selected_action_index(self) -> Optional[int]:
-        """
-        Get the index of the selected action.
+         """Get the index of the action currently selected in the list."""
+         if not self.action_list_widget: return None
+         selection_indices = self.action_list_widget.curselection()
+         return selection_indices[0] if selection_indices else None
 
-        Returns:
-            The index of the selected action, or None if no action is selected
-        """
-        selected_indices = self.action_listbox.curselection()
-        if not selected_indices:
-            return None
-            
-        return selected_indices[0]
+    def show_action_editor(self, action_data: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+         """Show the dedicated ActionEditorDialog to add/edit an action."""
+         self.logger.debug(f"Showing ActionEditorDialog. Initial data: {action_data}")
+         try:
+              # Use the new custom dialog, passing main_frame as parent
+              dialog = ActionEditorDialog(self.main_frame, initial_data=action_data)
+              result_data = dialog.show() # show() blocks and returns data or None
+              self.logger.debug(f"ActionEditorDialog returned: {result_data}")
+              return result_data
+         except Exception as e:
+              self.logger.error(f"Error showing ActionEditorDialog: {e}", exc_info=True)
+              self.display_error("Dialog Error", f"Could not open action editor: {e}")
+              return None
 
-    def update_action_list(self, actions: List[Any]) -> None:
-        """
-        Update the action listbox with the given actions.
+    def prompt_for_workflow_name(self, title: str, prompt: str) -> Optional[str]:
+         """Prompt user for a workflow name."""
+         return super().prompt_for_input(title, prompt)
 
-        Args:
-            actions: The list of actions to display
-        """
-        # Clear the listbox
-        self.action_listbox.delete(0, tk.END)
-        
-        # Add each action to the listbox
-        for action in actions:
-            action_dict = action.to_dict()
-            action_type = action_dict.get("type", "Unknown")
-            
-            if action_type == "Navigate":
-                url = action_dict.get("url", "")
-                self.action_listbox.insert(tk.END, f"Navigate to {url}")
-            elif action_type == "Click":
-                selector = action_dict.get("selector", "")
-                self.action_listbox.insert(tk.END, f"Click element {selector}")
-            elif action_type == "Type":
-                selector = action_dict.get("selector", "")
-                value_type = action_dict.get("value_type", "")
-                value = action_dict.get("value", "")
-                value_key = action_dict.get("value_key", "")
-                
-                if value_type == "text":
-                    self.action_listbox.insert(tk.END, f"Type '{value}' into {selector}")
-                elif value_type == "credential":
-                    self.action_listbox.insert(tk.END, f"Type credential {value_key} into {selector}")
-            elif action_type == "Wait":
-                duration = action_dict.get("duration_seconds", 0)
-                self.action_listbox.insert(tk.END, f"Wait for {duration} seconds")
-            elif action_type == "Screenshot":
-                file_path = action_dict.get("file_path", "")
-                self.action_listbox.insert(tk.END, f"Take screenshot to {file_path}")
+    def clear(self) -> None:
+        """Clear the workflow and action lists."""
+        self.logger.debug("Clearing editor view.")
+        if self.workflow_list_widget: self.workflow_list_widget.delete(0, tk.END)
+        if self.action_list_widget: self.action_list_widget.delete(0, tk.END)
+        self._update_workflow_button_states()
+        self._update_action_button_states()
+        super().clear() # Call base clear for status bar etc.
+
+    # --- Internal Event Handlers ---
+
+    def _on_workflow_selected(self, event: Optional[tk.Event] = None) -> None:
+        """Callback when a workflow is selected."""
+        selected_name = self.get_selected_workflow_name()
+        self.logger.debug(f"Workflow selected: {selected_name}")
+        self._update_workflow_button_states()
+        self._update_action_button_states() # Update action buttons based on workflow selection
+        if selected_name:
+            self.presenter.load_workflow(selected_name)
+        else:
+            self.set_action_list([]) # Clear action list if nothing selected
+
+
+    def _on_action_selected(self, event: Optional[tk.Event] = None) -> None:
+        """Callback when an action is selected."""
+        self._update_action_button_states()
+
+    def _on_new_workflow(self) -> None:
+        """Handle 'New Workflow' button press."""
+        self.logger.debug("New workflow button pressed.")
+        name = self.prompt_for_workflow_name("New Workflow", "Enter name for new workflow:")
+        if name:
+            self.presenter.create_new_workflow(name)
+        else:
+             self.logger.debug("New workflow cancelled by user.")
+
+    def _on_save_workflow(self) -> None:
+        """Handle 'Save Workflow' button press."""
+        self.logger.debug("Save workflow button pressed.")
+        name = self.get_selected_workflow_name()
+        if name:
+             # Tell presenter to save the currently loaded state
+             self.presenter.save_workflow(name) # Presenter holds the actions
+        else:
+             self.logger.warning("Save button pressed but no workflow selected.")
+             self.set_status("Please select a workflow to save.")
+
+
+    def _on_delete_workflow(self) -> None:
+        """Handle 'Delete Workflow' button press."""
+        self.logger.debug("Delete workflow button pressed.")
+        name = self.get_selected_workflow_name()
+        if name:
+            if self.confirm_action("Confirm Delete", f"Are you sure you want to delete workflow '{name}'? This cannot be undone."):
+                self.presenter.delete_workflow(name) # Delegate to presenter
+        else:
+             self.logger.warning("Delete button pressed but no workflow selected.")
+             self.set_status("Please select a workflow to delete.")
+
+    def _on_add_action(self) -> None:
+        """Handle 'Add Action' button press."""
+        self.logger.debug("Add action button pressed.")
+        if self.get_selected_workflow_name() is None:
+             self.display_message("Add Action", "Please select or create a workflow first.")
+             return
+        # Use the new dialog
+        action_data = self.show_action_editor() # No initial data for add
+        if action_data:
+            # Delegate adding to presenter (updates internal state)
+            self.presenter.add_action(action_data)
+        else:
+             self.logger.debug("Add action cancelled by user.")
+
+    def _on_edit_action(self, event: Optional[tk.Event] = None) -> None: # Can be called by button or double-click
+        """Handle 'Edit Action' button press or double-click."""
+        self.logger.debug("Edit action triggered.")
+        index = self.get_selected_action_index()
+        if index is not None:
+            # Get current data from presenter's internal state
+            current_action_data = self.presenter.get_action_data(index)
+            if current_action_data:
+                 # Use the new dialog with initial data
+                 new_action_data = self.show_action_editor(current_action_data)
+                 if new_action_data:
+                      # Delegate update to presenter (updates internal state)
+                      self.presenter.update_action(index, new_action_data)
+                 else:
+                      self.logger.debug("Edit action cancelled by user.")
             else:
-                self.action_listbox.insert(tk.END, f"{action_type} action")
+                 # Error handled by get_action_data, but show msg just in case
+                 self.display_error("Edit Error", f"Could not retrieve data for action at index {index}.")
+        else:
+             self.logger.warning("Edit action triggered but no action selected.")
+             self.set_status("Please select an action to edit.")
 
-    def show_action_dialog(self, current_action: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-        """
-        Show a dialog for adding or editing an action.
 
-        Args:
-            current_action: The current action data, if editing an existing action
+    def _on_delete_action(self) -> None:
+        """Handle 'Delete Action' button press."""
+        self.logger.debug("Delete action button pressed.")
+        index = self.get_selected_action_index()
+        if index is not None:
+            action_name_display = self.action_list_widget.get(index) if self.action_list_widget else f"Action {index+1}"
+            if self.confirm_action("Confirm Delete", f"Are you sure you want to delete '{action_name_display}'?"):
+                # Delegate deletion to presenter (updates internal state)
+                self.presenter.delete_action(index)
+        else:
+             self.logger.warning("Delete action button pressed but no action selected.")
+             self.set_status("Please select an action to delete.")
 
-        Returns:
-            The action data entered by the user, or None if the user cancelled
-        """
-        # Create a dialog window
-        dialog = tk.Toplevel(self.root)
-        dialog.title("Action Editor")
-        dialog.transient(self.root)
-        dialog.grab_set()
-        
-        # Create a frame for the dialog content
-        frame = ttk.Frame(dialog, padding="10")
-        frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Create a variable for the action type
-        action_type_var = tk.StringVar(value="Navigate")
-        if current_action:
-            action_type_var.set(current_action.get("type", "Navigate"))
-        
-        # Create a label and combobox for the action type
-        ttk.Label(frame, text="Action Type:").grid(row=0, column=0, sticky=tk.W)
-        action_type_combobox = ttk.Combobox(
-            frame, textvariable=action_type_var, values=["Navigate", "Click", "Type", "Wait", "Screenshot"]
-        )
-        action_type_combobox.grid(row=0, column=1, sticky=(tk.W, tk.E))
-        action_type_combobox.bind("<<ComboboxSelected>>", lambda e: self.update_action_dialog(frame, action_type_var.get()))
-        
-        # Create a frame for the action parameters
-        param_frame = ttk.Frame(frame)
-        param_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # Create a dictionary to store the parameter variables
-        param_vars = {}
-        
-        # Create a function to update the parameter frame based on the action type
-        def update_param_frame():
-            # Clear the parameter frame
-            for widget in param_frame.winfo_children():
-                widget.destroy()
-                
-            # Create parameters based on the action type
-            action_type = action_type_var.get()
-            
-            if action_type == "Navigate":
-                ttk.Label(param_frame, text="URL:").grid(row=0, column=0, sticky=tk.W)
-                url_var = tk.StringVar(value=current_action.get("url", "") if current_action else "")
-                ttk.Entry(param_frame, textvariable=url_var, width=40).grid(row=0, column=1, sticky=(tk.W, tk.E))
-                param_vars["url"] = url_var
-                
-            elif action_type == "Click":
-                ttk.Label(param_frame, text="Selector:").grid(row=0, column=0, sticky=tk.W)
-                selector_var = tk.StringVar(value=current_action.get("selector", "") if current_action else "")
-                ttk.Entry(param_frame, textvariable=selector_var, width=40).grid(row=0, column=1, sticky=(tk.W, tk.E))
-                param_vars["selector"] = selector_var
-                
-            elif action_type == "Type":
-                ttk.Label(param_frame, text="Selector:").grid(row=0, column=0, sticky=tk.W)
-                selector_var = tk.StringVar(value=current_action.get("selector", "") if current_action else "")
-                ttk.Entry(param_frame, textvariable=selector_var, width=40).grid(row=0, column=1, sticky=(tk.W, tk.E))
-                param_vars["selector"] = selector_var
-                
-                ttk.Label(param_frame, text="Value Type:").grid(row=1, column=0, sticky=tk.W)
-                value_type_var = tk.StringVar(value=current_action.get("value_type", "text") if current_action else "text")
-                ttk.Combobox(
-                    param_frame, textvariable=value_type_var, values=["text", "credential"]
-                ).grid(row=1, column=1, sticky=(tk.W, tk.E))
-                param_vars["value_type"] = value_type_var
-                
-                ttk.Label(param_frame, text="Value:").grid(row=2, column=0, sticky=tk.W)
-                value_var = tk.StringVar(value=current_action.get("value", "") if current_action else "")
-                ttk.Entry(param_frame, textvariable=value_var, width=40).grid(row=2, column=1, sticky=(tk.W, tk.E))
-                param_vars["value"] = value_var
-                
-                ttk.Label(param_frame, text="Credential Key:").grid(row=3, column=0, sticky=tk.W)
-                value_key_var = tk.StringVar(value=current_action.get("value_key", "") if current_action else "")
-                ttk.Entry(param_frame, textvariable=value_key_var, width=40).grid(row=3, column=1, sticky=(tk.W, tk.E))
-                param_vars["value_key"] = value_key_var
-                
-            elif action_type == "Wait":
-                ttk.Label(param_frame, text="Duration (seconds):").grid(row=0, column=0, sticky=tk.W)
-                duration_var = tk.StringVar(value=str(current_action.get("duration_seconds", 1)) if current_action else "1")
-                ttk.Entry(param_frame, textvariable=duration_var, width=10).grid(row=0, column=1, sticky=(tk.W, tk.E))
-                param_vars["duration_seconds"] = duration_var
-                
-            elif action_type == "Screenshot":
-                ttk.Label(param_frame, text="File Path:").grid(row=0, column=0, sticky=tk.W)
-                file_path_var = tk.StringVar(value=current_action.get("file_path", "") if current_action else "")
-                ttk.Entry(param_frame, textvariable=file_path_var, width=40).grid(row=0, column=1, sticky=(tk.W, tk.E))
-                param_vars["file_path"] = file_path_var
-        
-        # Update the parameter frame initially
-        update_param_frame()
-        
-        # Create a function to handle the OK button
-        def on_ok():
-            # Create the action data
-            action_data = {"type": action_type_var.get()}
-            
-            # Add the parameters
-            for param_name, param_var in param_vars.items():
-                # Convert numeric values
-                if param_name == "duration_seconds":
-                    try:
-                        action_data[param_name] = int(param_var.get())
-                    except ValueError:
-                        messagebox.showerror("Error", "Duration must be a number")
-                        return
-                else:
-                    action_data[param_name] = param_var.get()
-            
-            # Close the dialog
-            dialog.result = action_data
-            dialog.destroy()
-        
-        # Create a function to handle the Cancel button
-        def on_cancel():
-            dialog.result = None
-            dialog.destroy()
-        
-        # Create OK and Cancel buttons
-        button_frame = ttk.Frame(frame)
-        button_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.E, tk.S))
-        
-        ttk.Button(button_frame, text="OK", command=on_ok).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=on_cancel).pack(side=tk.RIGHT, padx=5)
-        
-        # Bind the action type combobox to update the parameter frame
-        action_type_combobox.bind("<<ComboboxSelected>>", lambda e: update_param_frame())
-        
-        # Wait for the dialog to be closed
-        dialog.wait_window()
-        
-        # Return the result
-        return getattr(dialog, "result", None)
+    # --- Widget State Management ---
+
+    def _update_workflow_button_states(self) -> None:
+        """Enable/disable workflow buttons based on selection."""
+        selected = self.get_selected_workflow_name() is not None
+        save_state = tk.NORMAL if selected else tk.DISABLED
+        delete_state = tk.NORMAL if selected else tk.DISABLED
+
+        if self.save_button: self.save_button.config(state=save_state)
+        if self.delete_button: self.delete_button.config(state=delete_state)
+        if self.new_button: self.new_button.config(state=tk.NORMAL)
+
+
+    def _update_action_button_states(self, workflow_selected: Optional[bool] = None) -> None:
+        """Enable/disable action buttons based on selections."""
+        if workflow_selected is None:
+             workflow_selected = self.get_selected_workflow_name() is not None
+        action_selected = self.get_selected_action_index() is not None
+
+        add_state = tk.NORMAL if workflow_selected else tk.DISABLED
+        edit_state = tk.NORMAL if action_selected else tk.DISABLED
+        delete_state = tk.NORMAL if action_selected else tk.DISABLED
+
+        if self.add_action_button: self.add_action_button.config(state=add_state)
+        if self.edit_action_button: self.edit_action_button.config(state=edit_state)
+        if self.delete_action_button: self.delete_action_button.config(state=delete_state)

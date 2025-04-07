@@ -17,6 +17,7 @@ import argparse
 import logging
 import datetime
 import fnmatch
+import json
 from typing import List, Dict, Tuple
 
 # Configure logging
@@ -133,12 +134,13 @@ def prepare_file_structure(
     logger.info(f"Prepared structure for {len(files_to_process)} files")
     return files_to_process, skipped_files
 
-def parse_gemini_file(file_path: str) -> Tuple[List[str], Dict[str, str], List[str]]:
+def parse_gemini_file(file_path: str, missing_files: Dict[str, str] = None) -> Tuple[List[str], Dict[str, str], List[str]]:
     """
     Parse a file in Gemini format.
 
     Args:
         file_path: Path to the file in Gemini format
+        missing_files: Dictionary of missing files from previous runs
 
     Returns:
         Tuple containing:
@@ -146,6 +148,8 @@ def parse_gemini_file(file_path: str) -> Tuple[List[str], Dict[str, str], List[s
             - Dictionary mapping file paths to content
             - List of error messages
     """
+    if missing_files is None:
+        missing_files = {}
     logger.info(f"Parsing Gemini file: {file_path}")
 
     try:
@@ -325,6 +329,50 @@ def apply_changes(
 
     return created_files, updated_files, skipped_files, failed_files
 
+def load_missing_files():
+    """Load missing files from the error log."""
+    missing_files = {}
+    error_log_path = "gemini_missing_files.json"
+
+    if os.path.exists(error_log_path):
+        try:
+            with open(error_log_path, 'r', encoding='utf-8') as f:
+                missing_files = json.load(f)
+            logger.info(f"Loaded {len(missing_files)} missing files from error log")
+        except Exception as e:
+            logger.error(f"Failed to load error log: {e}")
+            missing_files = {}
+
+    return missing_files
+
+def save_missing_files(missing_files):
+    """Save missing files to the error log in an additive manner."""
+    error_log_path = "gemini_missing_files.json"
+
+    # First load existing missing files if any
+    existing_missing_files = {}
+    if os.path.exists(error_log_path):
+        try:
+            with open(error_log_path, 'r', encoding='utf-8') as f:
+                existing_missing_files = json.load(f)
+            logger.info(f"Loaded {len(existing_missing_files)} existing missing files from error log")
+        except Exception as e:
+            logger.error(f"Failed to load existing error log: {e}")
+
+    # Merge the dictionaries, keeping all entries
+    # If a file is in both, keep the earliest mention (don't overwrite)
+    for file_path, source in missing_files.items():
+        if file_path not in existing_missing_files:
+            existing_missing_files[file_path] = source
+
+    # Save the merged dictionary
+    try:
+        with open(error_log_path, 'w', encoding='utf-8') as f:
+            json.dump(existing_missing_files, f, indent=2)
+        logger.info(f"Saved {len(existing_missing_files)} missing files to error log")
+    except Exception as e:
+        logger.error(f"Failed to save error log: {e}")
+
 def main():
     """Main function."""
     start_time = datetime.datetime.now()
@@ -346,9 +394,12 @@ def main():
 
     args = parser.parse_args()
 
+    # Load missing files from previous runs
+    missing_files = load_missing_files()
+
     # Parse the Gemini file
     logger.info(f"Processing Gemini file from {args.file_path}")
-    file_list, file_contents, errors = parse_gemini_file(args.file_path)
+    file_list, file_contents, errors = parse_gemini_file(args.file_path, missing_files)
 
     if not file_list:
         logger.error("No files found in the file list")
@@ -370,6 +421,31 @@ def main():
         file_list, file_contents, args.ignore_patterns
     )
 
+    # Create a new dictionary for missing files in this run
+    current_missing_files = {}
+
+    # Update missing files list
+    for file_path in file_list:
+        if file_path not in file_contents:
+            # File was in the list but no content was found
+            current_missing_files[file_path] = f"Missing in {args.file_path}"
+            logger.warning(f"File in list but no content found: {file_path}")
+
+    # Remove files from the current run's missing files if they were found
+    # This doesn't affect the global missing_files dictionary from previous runs
+    for file_path in list(missing_files.keys()):
+        if file_path in file_contents:
+            logger.info(f"Found previously missing file: {file_path}")
+            del missing_files[file_path]
+
+    # Merge current missing files with the global list
+    # This ensures we track all missing files across runs
+    missing_files.update(current_missing_files)
+
+    # Save updated missing files list
+    logger.info(f"Saving {len(missing_files)} missing files to error log")
+    save_missing_files(missing_files)
+
     # Calculate elapsed time
     end_time = datetime.datetime.now()
     elapsed_time = end_time - start_time
@@ -380,6 +456,8 @@ def main():
     print(f"  Updated: {len(updated_files)} files")
     print(f"  Skipped: {len(skipped_files)} files")
     print(f"  Failed: {len(failed_files)} files")
+    print(f"  Missing in this run: {len(current_missing_files)} files")
+    print(f"  Total missing across all runs: {len(missing_files)} files")
     print(f"  Total time: {elapsed_time}")
 
     if created_files:
@@ -401,8 +479,21 @@ def main():
         for file_path in failed_files:
             print(f"  {file_path}")
 
+    if current_missing_files:
+        print("\nMissing files in this run:")
+        for file_path, source in list(current_missing_files.items())[:10]:  # Show only first 10 to avoid clutter
+            print(f"  {file_path} ({source})")
+        if len(current_missing_files) > 10:
+            print(f"  ... and {len(current_missing_files) - 10} more")
+
+    if missing_files:
+        print("\nTotal missing files across all runs:")
+        print(f"  {len(missing_files)} files in total")
+        print("  (See gemini_missing_files.json for the complete list)")
+
     logger.info(f"Processing complete. Created: {len(created_files)}, Updated: {len(updated_files)}, "
-                f"Skipped: {len(skipped_files)}, Failed: {len(failed_files)}")
+                f"Skipped: {len(skipped_files)}, Failed: {len(failed_files)}, "
+                f"Missing in this run: {len(current_missing_files)}, Total missing: {len(missing_files)}")
     logger.info(f"Script completed at {end_time} (elapsed: {elapsed_time})")
 
     return 0 if not failed_files else 1
