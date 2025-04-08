@@ -1,3 +1,4 @@
+################################################################################
 """Template Action for AutoQliq."""
 
 import logging
@@ -56,7 +57,10 @@ class TemplateAction(ActionBase):
         context: Optional[Dict[str, Any]] = None
     ) -> ActionResult:
         """Execute method placeholder for TemplateAction."""
-        logger.warning(f"TemplateAction '{self.name}' execute() called directly. Expansion should occur in runner.")
+        # This method should ideally NOT be called directly if the runner expands templates.
+        # If it is called, it means expansion didn't happen or it's used unexpectedly.
+        logger.warning(f"TemplateAction '{self.name}' (template '{self.template_name}') execute() called directly. "
+                       "Expansion should occur in runner. Returning success as placeholder.")
         return ActionResult.success(f"Placeholder for template '{self.template_name}' reached.")
 
 
@@ -72,3 +76,5 @@ class TemplateAction(ActionBase):
     def __str__(self) -> str:
         """User-friendly string representation."""
         return f"{self.action_type}: {self.name} (Uses '{self.template_name}')"
+
+################################################################################

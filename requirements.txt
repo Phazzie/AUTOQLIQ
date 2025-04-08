@@ -1,5 +1,7 @@
+################################################################################
 selenium
 werkzeug>=2.0 # For password hashing
 # passlib is another good option for hashing
 configparser # Explicitly add if needed for older Python versions (included in standard library >= 3.2)
 apscheduler>=3.0 # Added for future scheduling implementation
+################################################################################

@@ -1,3 +1,4 @@
+################################################################################
 """Loop Action for AutoQliq."""
 
 import logging
@@ -73,7 +74,6 @@ class LoopAction(ActionBase):
              self.list_variable_name = list_variable_name
         elif self.loop_type == "while":
              if not condition_type: raise ValidationError("'condition_type' required.", field_name="condition_type")
-             # Detailed validation in validate()
 
         self.loop_actions = loop_actions or []
         if not isinstance(self.loop_actions, list) or not all(isinstance(a, IAction) for a in self.loop_actions):
@@ -117,7 +117,6 @@ class LoopAction(ActionBase):
 
     def _evaluate_while_condition(self, driver: IWebDriver, context: Optional[Dict[str, Any]]) -> bool:
          """Evaluate the 'while' loop condition."""
-         # Create temporary ConditionalAction to reuse its evaluation logic
          temp_cond = ConditionalAction(
               condition_type=self.condition_type or "", selector=self.selector,
               variable_name=self.variable_name, expected_value=self.expected_value, script=self.script
@@ -131,6 +130,7 @@ class LoopAction(ActionBase):
         context: Optional[Dict[str, Any]] = None
     ) -> ActionResult:
         """Execute the nested actions repeatedly based on the loop type."""
+        # This action executes its children. Use local runner helper.
         logger.info(f"Executing {self.action_type} action (Name: {self.name}). Type: {self.loop_type}")
         try:
             self.validate()
@@ -233,3 +233,5 @@ class LoopAction(ActionBase):
         elif self.loop_type == "while": detail = f"while {self.condition_type} (...)"
         action_count = len(self.loop_actions)
         return f"{self.action_type}: {self.name} ({detail}, {action_count} actions)"
+
+################################################################################

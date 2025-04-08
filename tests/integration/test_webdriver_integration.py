@@ -1,3 +1,4 @@
+################################################################################
 """Integration tests for WebDriver implementations (Selenium)."""
 
 import unittest
@@ -87,7 +88,7 @@ class TestWebDriverIntegration(unittest.TestCase):
     def test_find_element_present(self):
         """Test finding an existing element by CSS selector."""
         self.assertIsNotNone(self.driver); self.driver.get(TEST_SITE_URL)
-        element = self.driver.find_element("h2") # Find first h2 element
+        element = self.driver.find_element("h2")
         self.assertIsNotNone(element)
         if hasattr(element, 'tag_name'): self.assertEqual(element.tag_name.lower(), 'h2')
 
@@ -119,9 +120,14 @@ class TestWebDriverIntegration(unittest.TestCase):
          title = self.driver.execute_script("return document.title;")
          self.assertIsInstance(title, str); self.assertIn("httpbin", title)
          result = self.driver.execute_script("return arguments[0] + arguments[1];", 10, 22); self.assertEqual(result, 32)
-         # Test returning non-primitive
          result_obj = self.driver.execute_script("return {a: 1, b: 'hello'};")
          self.assertIsInstance(result_obj, dict); self.assertEqual(result_obj.get('a'), 1)
+
+    def test_execute_script_error(self):
+         """Test executing invalid JavaScript raises WebDriverError."""
+         self.assertIsNotNone(self.driver); self.driver.get(TEST_SITE_URL)
+         with self.assertRaisesRegex(WebDriverError, "javascript error"): # Selenium includes this phrase
+              self.driver.execute_script("return document.badMethod();")
 
     def test_wait_for_element_success(self):
          """Test waiting for an element that appears."""
@@ -146,6 +152,9 @@ class TestWebDriverIntegration(unittest.TestCase):
 
 if __name__ == '__main__':
     if DRIVER_AVAILABLE:
+        # logging.basicConfig(level=logging.DEBUG) # Uncomment for detailed logs
         unittest.main(argv=['first-arg-is-ignored'], exit=False)
     else:
         print(f"Skipping WebDriver integration tests for {BROWSER_TO_TEST_STR}.")
+
+################################################################################

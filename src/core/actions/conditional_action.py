@@ -1,3 +1,4 @@
+################################################################################
 """Conditional Action (If/Else) for AutoQliq."""
 
 import logging
@@ -158,13 +159,10 @@ class ConditionalAction(ActionBase):
             logger.info(f"Executing '{branch_name}' branch of '{self.name}'...")
 
             # --- Execute Chosen Branch ---
-            # This action needs to execute its children. It doesn't return them to the runner.
-            from src.core.workflow.runner import WorkflowRunner # Local import to avoid circular dependency at module level
-            # Create a temporary runner instance to execute the branch.
-            # Pass None for workflow_repo and stop_event as they aren't needed for sub-execution here.
+            # This action executes its children. Use local runner helper.
+            from src.core.workflow.runner import WorkflowRunner # Local import
             temp_runner = WorkflowRunner(driver, credential_repo, None, None)
 
-            # Execute the branch actions using the runner's internal helper for consistency
             # Pass the *current* context down. Conditional branches don't create new scope.
             branch_results = temp_runner._execute_actions(branch_to_execute, context or {}, workflow_name=self.name, log_prefix=f"{branch_name}: ")
             # If _execute_actions completes without raising ActionError, the branch succeeded.
@@ -173,7 +171,7 @@ class ConditionalAction(ActionBase):
             final_msg = f"Condition {condition_result}, '{branch_name}' branch ({len(branch_results)} actions) executed."
             return ActionResult.success(final_msg)
 
-        except (ValidationError, ActionError) as e: # Catch errors from validate, _evaluate, or nested _execute_actions
+        except (ValidationError, ActionError) as e: # Catch errors from validate, _evaluate, or nested execute
             msg = f"Error during conditional execution '{self.name}': {e}"
             logger.error(msg)
             return ActionResult.failure(msg)
@@ -214,3 +212,5 @@ class ConditionalAction(ActionBase):
         elif self.condition_type == "javascript_eval": condition_detail = f"script='{self.script[:20]}...'" if self.script else "script=''"
         true_count = len(self.true_branch); false_count = len(self.false_branch)
         return f"{self.action_type}: {self.name} (if {self.condition_type} {condition_detail} ? {true_count} : {false_count})"
+
+################################################################################

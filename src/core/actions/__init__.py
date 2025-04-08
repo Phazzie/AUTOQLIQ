@@ -1,3 +1,4 @@
+################################################################################
 """Actions package initialization for AutoQliq.
 
 This package contains all action-related components, including base classes,
@@ -27,3 +28,4 @@ __all__ = [
     "TemplateAction",
     "ActionFactory",
 ]
+################################################################################

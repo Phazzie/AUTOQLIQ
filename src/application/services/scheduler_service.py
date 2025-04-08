@@ -1,3 +1,4 @@
+################################################################################
 """Scheduler service stub implementation for AutoQliq."""
 
 import logging
@@ -96,7 +97,7 @@ class SchedulerService(ISchedulerService):
          except Exception as e:
               # Log errors from the scheduled run prominently
               # This catches errors if run_workflow itself fails unexpectedly or raises something new
-              logger.error(f"SCHEDULER: Unhandled error running scheduled job '{job_id}' for workflow '{workflow_name}': {e}", exc_info=True)
+              logger.error(f"SCHEDULER: Error running scheduled job '{job_id}' for workflow '{workflow_name}': {e}", exc_info=True)
               # TODO: Add logic for handling repeated failures (e.g., disable job)
 
 
@@ -129,17 +130,17 @@ class SchedulerService(ISchedulerService):
 
             if trigger is None: raise ValueError(f"Unsupported trigger type: {trigger_type}")
 
-            # Add the job
+            # Add the job - use self._run_scheduled_workflow as the target function
             added_job = self.scheduler.add_job(
                  func=self._run_scheduled_workflow,
                  trigger=trigger,
-                 args=[job_id, workflow_name, credential_name],
+                 args=[job_id, workflow_name, credential_name], # Args passed to _run_scheduled_workflow
                  id=job_id,
                  name=schedule_config.get('name', f"Run '{workflow_name}' ({trigger_type})"),
                  replace_existing=True # Update if job with same ID exists
             )
-            if added_job is None:
-                 raise AutoQliqError(f"Scheduler returned None for job '{job_id}'. Scheduling failed.")
+            if added_job is None: # Should not happen with replace_existing=True unless error
+                 raise AutoQliqError(f"Scheduler returned None for job '{job_id}'. Scheduling might have failed silently.")
 
             logger.info(f"Successfully scheduled job '{added_job.id}' for workflow '{workflow_name}'.")
             return added_job.id
@@ -170,8 +171,8 @@ class SchedulerService(ISchedulerService):
                  job_list.append({
                       "id": job.id,
                       "name": job.name,
-                      "workflow_name": wf_name,
-                      "credential_name": cred_name,
+                      "workflow_name": wf_name, # Add workflow name from args
+                      "credential_name": cred_name, # Add credential name from args
                       "next_run_time": job.next_run_time.isoformat() if job.next_run_time else None,
                       "trigger": str(job.trigger)
                  })
@@ -206,3 +207,5 @@ class SchedulerService(ISchedulerService):
                  logger.info("SchedulerService shut down.")
             except Exception as e: logger.error(f"Error shutting down scheduler: {e}", exc_info=True)
         else: logger.info("SchedulerService shutdown (scheduler not running or unavailable).")
+
+################################################################################

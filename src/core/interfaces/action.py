@@ -1,3 +1,4 @@
+################################################################################
 """Action interface for AutoQliq.
 
 This module defines the interface for action implementations that provide
@@ -83,3 +84,6 @@ class IAction(abc.ABC):
     def get_nested_actions(self) -> List['IAction']:
         """Return any nested actions contained within this action."""
         return [] # Default implementation for actions that don't contain others
+
+
+################################################################################

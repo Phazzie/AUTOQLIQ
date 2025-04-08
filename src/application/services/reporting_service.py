@@ -1,3 +1,4 @@
+################################################################################
 """Reporting service implementation for AutoQliq using simple file storage."""
 
 import logging
@@ -45,12 +46,12 @@ class ReportingService(IReportingService):
          """Generates a unique filename based on log content."""
          try:
              start_dt = datetime.fromisoformat(execution_log['start_time_iso'])
-             ts_str = start_dt.strftime("%Y%m%d_%H%M%S")
+             # Use microseconds for higher chance of uniqueness
+             ts_str = start_dt.strftime("%Y%m%d_%H%M%S_%f")
          except (ValueError, KeyError):
              ts_str = datetime.now().strftime("%Y%m%d_%H%M%S_%f") # Fallback timestamp
          safe_wf_name = "".join(c if c.isalnum() else "_" for c in execution_log.get('workflow_name', 'UnknownWF'))
          status = execution_log.get('final_status', 'UNKNOWN')
-         # Use start time for uniqueness, status for easier browsing
          return f"exec_{safe_wf_name}_{ts_str}_{status}.json"
 
     # --- Methods required by IReportingService ---
@@ -82,7 +83,7 @@ class ReportingService(IReportingService):
         """Saves the full execution log data to a unique JSON file."""
         if not isinstance(execution_log, dict) or not execution_log.get('workflow_name') or not execution_log.get('start_time_iso'):
             logger.error("Attempted to save invalid execution log data (missing required keys).")
-            raise ValueError("Invalid execution log data provided.") # Raise error
+            raise ValueError("Invalid execution log data provided.")
 
         try:
             filename = self._generate_filename(execution_log)
@@ -100,16 +101,14 @@ class ReportingService(IReportingService):
 
         except Exception as e:
              logger.error(f"Error processing execution log for saving: {e}", exc_info=True)
-             # Wrap unexpected errors
              raise AutoQliqError(f"Failed to process execution log: {e}", cause=e) from e
 
 
     @log_method_call(logger)
     def generate_summary_report(self, since: Optional[Any] = None) -> Dict[str, Any]:
         """Generate a summary report by reading log files."""
-        logger.info(f"Generating summary report (since: {since}). Reading logs from '{LOG_DIRECTORY}'.")
         # TODO: Implement reading and aggregation logic
-        logger.warning("Placeholder: Generate summary report called. Aggregation logic not implemented.")
+        logger.warning("Placeholder: Generate summary report called. Reading/aggregating logs not implemented.")
         return { "message": "Reporting aggregation logic not implemented." }
 
     @log_method_call(logger)
@@ -127,7 +126,7 @@ class ReportingService(IReportingService):
         try:
             if not os.path.exists(filepath) or not os.path.isfile(filepath):
                 logger.warning(f"Execution log file not found: {filepath}")
-                return None # Return None if file doesn't exist
+                return None
 
             with open(filepath, 'r', encoding='utf-8') as f:
                 log_data = json.load(f) # Raises JSONDecodeError
@@ -162,14 +161,12 @@ class ReportingService(IReportingService):
                  log_files = [f for f in log_files if f.startswith(f"exec_{safe_filter_name}_")]
 
             # Sort by timestamp in filename (descending - newest first)
-            # Assumes filename format exec_NAME_YYYYMMDD_HHMMSS_STATUS.json
             log_files.sort(reverse=True)
 
             # Limit results
-            log_files = log_files[:limit]
-
-            # Read summary info from each file
+            count = 0
             for filename in log_files:
+                if count >= limit: break
                 filepath = os.path.join(LOG_DIRECTORY, filename)
                 try:
                     with open(filepath, 'r', encoding='utf-8') as f:
@@ -181,16 +178,13 @@ class ReportingService(IReportingService):
                         "start_time_iso": log_data.get("start_time_iso"),
                         "duration_seconds": log_data.get("duration_seconds"),
                         "final_status": log_data.get("final_status", "UNKNOWN"),
+                        "error_message": log_data.get("error_message"), # Include error msg in summary
                     }
                     summaries.append(summary)
+                    count += 1
                 except Exception as e:
                      logger.error(f"Failed to read or parse summary from log file '{filename}': {e}")
-                     # Skip this file on error, maybe add a placeholder summary?
-                     summaries.append({
-                          "execution_id": filename, "workflow_name": "Error",
-                          "start_time_iso": None, "duration_seconds": None, "final_status": "PARSE_ERROR"
-                     })
-
+                     # Skip this file on error
 
             logger.debug(f"Found {len(summaries)} execution summaries.")
             return summaries
@@ -198,3 +192,5 @@ class ReportingService(IReportingService):
         except Exception as e:
              logger.error(f"Error listing past executions: {e}", exc_info=True)
              raise RepositoryError(f"Failed to list execution logs: {e}", cause=e) from e
+
+################################################################################

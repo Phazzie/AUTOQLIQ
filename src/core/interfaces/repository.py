@@ -1,3 +1,4 @@
+################################################################################
 """Repository interfaces for AutoQliq.
 
 This module defines the interfaces for repository implementations that provide
@@ -110,3 +111,5 @@ class IReportingRepository(abc.ABC):
 
     # Optional: Methods for querying based on date range, status, etc.
     # Optional: Method for cleaning up old logs
+
+################################################################################
