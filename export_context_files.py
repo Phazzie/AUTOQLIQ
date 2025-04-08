@@ -80,23 +80,23 @@ def create_export_folder():
     """Create the export folder with timestamp."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     export_folder = f"context_export_{timestamp}"
-    
+
     if not os.path.exists(export_folder):
         os.makedirs(export_folder)
         logger.info(f"Created export folder: {export_folder}")
-    
+
     return export_folder
 
 def export_file(file_path, export_folder, group_marker):
     """Export a single file to the export folder with group marker."""
     # Normalize path
     normalized_path = os.path.normpath(file_path)
-    
+
     # Check if file exists
     if not os.path.exists(normalized_path):
         logger.warning(f"File not found: {normalized_path}")
         return False
-    
+
     # Read file content
     try:
         with open(normalized_path, 'r', encoding='utf-8') as f:
@@ -104,7 +104,7 @@ def export_file(file_path, export_folder, group_marker):
     except Exception as e:
         logger.error(f"Failed to read file {normalized_path}: {e}")
         return False
-    
+
     # Create the export content with markers
     export_content = f"""
 ########## START FILE: {file_path} ##########
@@ -115,7 +115,7 @@ def export_file(file_path, export_folder, group_marker):
 ########## END FILE: {file_path} ##########
 
 """
-    
+
     # Write to the export file
     export_file_path = os.path.join(export_folder, "context_files.txt")
     try:
@@ -137,14 +137,14 @@ def create_group_summary(export_folder, group_files, group_name, group_descripti
 
 Files in this group:
 """
-    
+
     for file_path in group_files:
         normalized_path = os.path.normpath(file_path)
         exists = "✓" if os.path.exists(normalized_path) else "✗"
         summary_content += f"  {exists} {file_path}\n"
-    
+
     summary_content += "\n\n"
-    
+
     # Write to the summary file
     summary_file_path = os.path.join(export_folder, "context_summary.txt")
     try:
@@ -186,7 +186,7 @@ Instructions:
    - Include Group 3 (COULD ADD) files only if directly modifying them
 4. Remove these instructions before sending the prompt
 """
-    
+
     # Write to the template file
     template_file_path = os.path.join(export_folder, "first_prompt_template.txt")
     try:
@@ -202,11 +202,11 @@ def main():
     """Main function to run the script."""
     # Create export folder
     export_folder = create_export_folder()
-    
+
     # Create empty files to start fresh
     open(os.path.join(export_folder, "context_files.txt"), 'w').close()
     open(os.path.join(export_folder, "context_summary.txt"), 'w').close()
-    
+
     # Add header to summary file
     with open(os.path.join(export_folder, "context_summary.txt"), 'w', encoding='utf-8') as f:
         f.write(f"""
@@ -217,7 +217,7 @@ This file provides a summary of the context files exported for the AutoQliq proj
 The files are organized into three groups based on their importance for providing context in a new chat window.
 
 """)
-    
+
     # Export Group 1 files
     create_group_summary(
         export_folder,
@@ -226,10 +226,10 @@ The files are organized into three groups based on their importance for providin
         "These files define the core structure, interfaces, and how components are expected to interact. "
         "Without these, the AI cannot generate compatible or correctly integrated code."
     )
-    
+
     for file_path in GROUP_1_MUST_ADD:
         export_file(file_path, export_folder, "Group 1: MUST ADD")
-    
+
     # Export Group 2 files
     create_group_summary(
         export_folder,
@@ -238,10 +238,10 @@ The files are organized into three groups based on their importance for providin
         "These provide context on established patterns, recent complex additions, and key service implementations "
         "that presenters interact with. They significantly help in understanding how things currently work."
     )
-    
+
     for file_path in GROUP_2_SHOULD_ADD:
         export_file(file_path, export_folder, "Group 2: SHOULD PROBABLY ADD")
-    
+
     # Export Group 3 files
     create_group_summary(
         export_folder,
@@ -250,19 +250,19 @@ The files are organized into three groups based on their importance for providin
         "These are less critical for general context but might be useful if the very next task involves "
         "modifying or testing them specifically. Add only if needed."
     )
-    
+
     for file_path in GROUP_3_COULD_ADD:
         export_file(file_path, export_folder, "Group 3: COULD ADD")
-    
+
     # Create prompt template
     create_prompt_template(export_folder)
-    
+
     # Print summary
     print(f"\nContext files exported to {export_folder}/")
     print(f"  - context_files.txt: Contains all exported files with markers")
     print(f"  - context_summary.txt: Contains a summary of all files by group")
     print(f"  - first_prompt_template.txt: Template for the first prompt in a new chat window")
-    
+
     logger.info("Export completed successfully")
 
 if __name__ == "__main__":
@@ -272,9 +272,22 @@ if __name__ == "__main__":
 
 
 ########## START FILE: src/core/interfaces/action.py ##########
-w
-    action_type: str = "Loop"
-    SUPPORTED_TYPES = ["count", "for_each", "while"]
+"""Interface for actions in the AutoQliq framework."""
+
+from typing import Dict, Any, Optional, List
+
+class IAction:
+    """Interface for actions that can be executed in a workflow."""
+
+    action_type: str = "Base"
+
+    def execute(self, driver, credential_repo=None, context=None):
+        """Execute the action using the provided driver and context."""
+        pass
+
+    def validate(self) -> bool:
+        """Validate the action configuration."""
+        pass
 
     def __init__(self,
                  name: Optional[str] = None,
