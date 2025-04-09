@@ -341,7 +341,7 @@ class ResultsViewer(QWidget):
             files = results["files"]
             if isinstance(files, dict):
                 total_files = len(files)
-                files_with_issues = sum(1 for f in files.values() if isinstance(f, dict) and f.get("issues", []))
+                files_with_issues = sum(bool(isinstance(f, dict) and f.get("issues", []))
                 
                 summary += f"<p>Analyzed {total_files} files, found issues in {files_with_issues} files.</p>"
                 
