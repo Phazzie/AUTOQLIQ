@@ -92,6 +92,3 @@ class InMemoryCredentialManager(CredentialManager):
         logger.debug(f"Adding/updating credential for key '{key}' in in-memory store.")
         self._store[key] = value
 
-```
-
-```text
