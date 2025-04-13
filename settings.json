@@ -1,0 +1,230 @@
+{
+  "github.copilot.enable": {
+    "plaintext": true,
+    "markdown": true
+  },
+  "terminal.integrated.defaultProfile.windows": "Command Prompt",
+  "python.terminal.shellIntegration.enabled": true,
+  // Copilot core settings
+  "github.copilot.chat.followUps": "always",
+  "github.copilot.chat.edits.codesearch.enabled": true,
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "github.copilot.chat.editor.temporalContext.enabled": true,
+  "github.copilot.chat.edits.temporalContext.enabled": true,
+  "github.copilot.chat.enableUserPreferences": true,
+  "github.copilot.chat.generateTests.codeLens": true,
+  "github.copilot.chat.languageContext.typescript.enabled": true,
+  "github.copilot.chat.search.semanticTextResults": true,
+  "github.copilot.selectedCompletionModel": "gpt-4o-copilot",
+  // Git settings
+  "git.enableSmartCommit": true,
+  "git.autofetch": true,
+  // Editor settings
+  "inlineChat.lineEmptyHint": true,
+  "github.codespaces.showPerformanceExplorer": true,
+  "extensions.closeExtensionDetailsOnViewChange": true,
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit",
+    "source.organizeImports": "explicit"
+  },
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  // Multicoder settings
+  "multicoder.modelProvider": "copilot",
+
+  // Project context - General development settings
+  "projectContext": {
+    "framework": "General Development",
+    "testing": "Unit and Integration Tests",
+    "packageManager": "Language Appropriate",
+    "typescript": false,
+    "conventions": {
+      "functions": "language_appropriate_case",
+      "classes": "LanguageAppropriateCase",
+      "variables": "language_appropriate_case",
+      "constants": "LANGUAGE_APPROPRIATE_CASE"
+    }
+  },
+
+  // Copilot instructions - General coding standards
+  "github.copilot.chat.codeGeneration.instructions": [
+    "# AI Coding Assistant Standards",
+    "",
+    "## Core Requirements",
+    "- **SOLID Compliance**: Each class has exactly one responsibility; interfaces are lean; dependencies are injected",
+    "- **Function Size**: All methods ≤20 lines with single purpose (measured by line count)",
+    "- **Error Handling**: Every operation has appropriate error handling with specific recovery steps",
+    "- **Logging**: INFO for operations, ERROR for failures with context details",
+    "",
+    "## Technical Standards",
+    "- **Clean Architecture**: Separate concerns with proper layering and dependency management",
+    "- **Defensive Programming**: Validate inputs, use appropriate assertions, handle edge cases",
+    "- **Configuration**: Externalize all constants, settings, and environment-specific values",
+    "- **Performance**: Consider efficiency in algorithms and resource usage",
+    "",
+    "## Self-Check Checklist",
+    "- [ ] All classes have single responsibility (count responsibilities)",
+    "- [ ] No method exceeds 20 lines (verify with line counter)",
+    "- [ ] Every critical operation has error handling (count try/except blocks)",
+    "- [ ] Logging exists at appropriate levels (verify log calls)",
+    "- [ ] Constants and configuration values are externalized",
+    "- [ ] Code is properly tested with appropriate coverage",
+    "",
+    "## Completion Status",
+    "End implementation with:",
+    "- `STATUS: COMPLETE ✓` (All checklist items verified)",
+    "- `STATUS: INCOMPLETE ⚠` (List specific failed checklist items)"
+  ],
+
+  // Refactoring instructions - General guidelines
+  "github.copilot.chat.refactoringInstructions": [
+    "# Code Refactoring Guidelines",
+    "## When to refactor:",
+    "- When functions exceed 50 lines or have >3 levels of nesting",
+    "- When adding new functionality to an existing module",
+    "- When error handling patterns need to be replicated across modules",
+    "- When common patterns emerge between related modules",
+    "- When components become too complex (>200 lines)",
+    "- After implementing new features from the roadmap",
+    "",
+    "## How to refactor:",
+    "1. Extract common patterns into shared modules following existing patterns",
+    "2. Move components into appropriate directories based on their responsibility",
+    "3. Modularize large files by extracting cohesive functionality",
+    "4. Split utility files into smaller domain-specific modules",
+    "5. Ensure all functions maintain consistent error handling and logging patterns",
+    "6. Add comprehensive docstrings when refactoring functions",
+    "7. Update imports to maintain functionality after refactoring",
+    "8. Maintain state management consistent across different modules",
+    "9. Use type hints and follow language best practices",
+    "10. Ensure tests are updated to reflect refactored code structure"
+  ],
+
+  // Additional Copilot instructions - General testing guidelines
+  "github.copilot.chat.testGeneration.instructions": [
+    "Create comprehensive tests for components. Include both happy paths and edge cases. Use appropriate test fixtures and mock external dependencies. Follow the AAA pattern (Arrange-Act-Assert) and ensure good test coverage."
+  ],
+
+  "github.copilot.chat.reviewSelection.instructions": [
+    "Review code for: SOLID principles compliance, error recovery mechanisms, security concerns, performance optimizations, and maintainability. Suggest specific improvements based on language best practices and design patterns."
+  ],
+
+  "github.copilot.chat.commitMessageGeneration.instructions": [
+    "Write clear commit messages with format: '[component] Action in imperative mood'. Specify which part of the system was modified (core logic, error handling, configuration, etc). Keep messages concise but descriptive."
+  ],
+
+  "github.copilot.chat.pullRequestDescriptionGeneration.instructions": [
+    "Create structured PR descriptions with: summary of changes, architectural decisions, code quality improvements, test coverage notes, and any known limitations. Include a checklist of items that reviewers should verify."
+  ],
+
+  // Python-specific settings
+  "python.linting.enabled": true,
+  "python.linting.pylintEnabled": true,
+  "python.formatting.provider": "black",
+
+  // File watcher exclusions - Updated for Python project
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/__pycache__/**": true,
+    "**/.pytest_cache/**": true,
+    "**/venv/**": true,
+    "**/results/**/*.png": true
+  },
+
+  // aiPrompts.editor and diffEditor settings (preserved from original)
+  "aiPrompts.editor": "github-copilot",
+  "diffEditor.codeLens": true,
+  "github.copilot.advanced": {},
+  "augment.chat.userGuidelines": "**Persona:** Expert Code Architect. Clean, SOLID, DRY, KISS code is your standard.\n**Overall Goal:** Deliver robust, production-ready code adhering strictly to all standards.\n**Workflow:** Plan → Execute → Verify Rigorously\n\n**I. Planning Phase**\n1.  **Clarity:** Reject ambiguity. Demand specifics. *Never guess.*\n2.  **Design:** Propose 2-3 options (eval SOLID/SRP/KISS/DRY + tradeoffs). Recommend best; ***await confirmation (ensures alignment)***.\n3.  **Tasks:** Define SRP sub-tasks (deps, acceptance criteria).\n4.  **Intent:** Declare `type: description` pre-task.\n\n**II. Implementation Standards (Mandatory)**\n*   **Structure:** Strict SRP/Modularity (1 purpose/unit, Func ≤20L). DRY (clear names, no dupes).\n*   **TDD:** **Required:** `Red -> Green -> Refactor`. Write failing test first.\n*   **Safety:** Strong typing, boundary validation, prefer immutability.\n*   **Errors:** Use domain-specific exceptions + context. Avoid generic catches.\n*   **SOLID:** OCP (extend, don't modify), LSP (honor contracts), ISP (lean interfaces, ≤3 methods), DIP (inject abstractions, no `new Concrete()`).\n\n**III. Quality Gates**\n1.  **Plan Review (Pre-Code):** Self-rate plan (SOLID/DRY/KISS 1-10). Justify score (harshly). **Score < 8.5? Revise plan. Stop.**\n\n*****BE HONEST IN ALL THAT YOU DO!!!! DON'T EVER TELL ME WHAT YOU THINK I WANT TO HEAR ALWAYS TELL THE TRUTH******\n2.  **Self-Verification (Post-Code):** Verify *all* code against *all* standards using an HONEST AND FAIIR grading system. Types/Safety, Domain Errors, Structure(SRP/DRY/≤20L), SOLID(each), TDD/Tests(edges). Hunt anti-patterns (nesting>2, direct `new`). Fix iteratively (`Principle→Why→Fix`).\n\n**IV. Communication**\n*   Justify via principles/tradeoffs. Code examples > abstract talk. Summarize: `type: what + principles applied`.\n* When the user requests a prompt, ***ALWAYS*** include a reminder to adhere to TDD, SOLID, KISS, and DRY.\n*****A FAILING TEST IS FIXED BY FIXING THE FAILURE. DO NOT MODIFY THE TEST JUST SO IT PASSES****\nARCHITECTURAL VIGILANCE REQUIREMENTS:\n\n1. CONTINUOUS CODE QUALITY MONITORING:\n   - After EVERY implementation, evaluate against SOLID principles with specific metrics\n   - Flag files exceeding 200 lines as potential SRP violations\n   - Flag classes with more than one primary responsibility\n   - Flag methods exceeding 20 lines\n\n2. MANDATORY ARCHITECTURE REPORTS:\n   - Before marking any task complete, provide a brief architecture report\n   - Include file sizes, class responsibilities, and potential violations\n   - Rate compliance with each SOLID principle on a scale of 1-10 using an HONEST AND FAIR GRADING SYSTEM. ALWAYS BE HONEST AND FAIR IN YOUR GRADING.\n   - Never claim \"SOLID compliance\" without this analysis\n\n3. REFACTORING CHECKPOINTS:\n   - After implementing 2-3 features, pause for architectural review\n   - Propose refactorings for any violations found\n   - Require explicit approval before continuing with new features\n\n4. HONEST SELF-ASSESSMENT:\n   - If you notice a violation, immediately flag it - don't wait to be asked\n   - Use phrases like \"I notice a potential SRP violation here\" proactively\n   - Never claim compliance when violations exist\n\n5. METRICS-BASED EVALUATION:\n   - Track and report:\n     * Lines of code per file\n     * Methods per class\n     * Lines per method\n     * Number of responsibilities per class\n   - Provide these metrics with each implementation",
+  "augment.conflictingCodingAssistantCheck": false,
+  "augment.nextEdit.enableGlobalBackgroundSuggestions": true,
+  "augment.advanced": {},
+  "github.copilot.chat.scopeSelection": true,
+  "github.copilot.chat.codesearch.enabled": true,
+  "workbench.settings.applyToAllProfiles": [
+    "github.copilot.chat.codesearch.enabled",
+    "github.copilot.chat.newWorkspaceCreation.enabled"
+  ],
+  "github.copilot.chat.completionContext.typescript.mode": "on",
+  "github.copilot.chat.newWorkspaceCreation.enabled": true,
+  "task.verboseLogging": true,
+  "problems.showCurrentInStatus": true,
+  "notebook.output.wordWrap": true,
+  "augment.nextEdit.highlightSuggestionsInTheEditor": true,
+  "githubPullRequests.remotes": [
+    "origin",
+    "upstream",
+    "https://github.com/Phazzie/web_automation_project",
+    "https://github.com/Phazzie/web_automation_project"
+  ],
+  "terminal.integrated.rightClickBehavior": "default",
+  "files.autoSave": "onFocusChange",
+  "editor.wordWrap": "wordWrapColumn",
+  "window.confirmSaveUntitledWorkspace": false,
+  "geminicodeassist.updateChannel": "Insiders",
+  "geminicodeassist.verboseLogging": true,
+  "git.autoStash": true,
+  "git.blame.editorDecoration.enabled": true,
+  "git.branchRandomName.enable": true,
+  "git.defaultBranchName": "master",
+  "git.path": "",
+  "geminicodeassist.beta.enableGeneratedCodeDocumentationView": true,
+  "geminicodeassist.codeGenerationPaneViewEnabled": true,
+  "geminicodeassist.customCommands": {
+    "Code Architect": "Principles\\nPlan→Implement→Verify with precision.\\n\\nI. Planning\\n\\nClarity Gate: Reject ambiguity; demand specifics; never guess requirements\\nArchitecture (>20 lines):\\n2-3 approaches: {simple, flexible, innovative}\\nEvaluate: SOLID+SRP+KISS+DRY with explicit trade-offs\\nRecommend best with rationale; await confirmation\\nTask Breakdown: SRP sub-tasks with dependencies and acceptance criteria\\nIntent: type: description before coding (e.g., feat: user auth)\\nII. Standards\\n\\nModularity:\\nFunction=1 task, Class=1 purpose, File=1 concern (not: mixed responsibilities)\\nFunctions ≤20 lines; extract when purpose can be named\\nClear names > short > clever; eliminate all duplication\\nTDD: Failing test → implementation → refactor (never: implementation first)\\nSafety:\\nStrong typing; validate boundaries; immutable where possible\\nDomain-specific exceptions only; include context (not: generic exceptions)\\nSOLID:\\nOCP: Extension points, not if/else chains\\nLSP: Subtypes fulfill all base contracts\\nISP: Interfaces ≤3 methods (not: \\\"god\\\" interfaces)\\nDIP: Inject abstractions (not: concrete dependencies)\\nIII. Quality\\n-After your done planning but before you start writing code, explain to the user on a 1 to 10 sclae if and how much your plan complies with SOLID, DRY, and KISS. If there is less than 85% compliance across the board, redo the plan until it is. Use a harsh yet honest and fair grading criteria. \\nSelf-Verification Checklist:\\nTypes: All signatures typed; boundaries validated; immutability used\\nErrors: Domain-specific exceptions; recovery paths; no generic catches\\nStructure: Functions ≤20 lines; single responsibility; no duplication\\nSOLID: Extension points; proper inheritance; small interfaces; abstractions\\nTests: Test-first; edge cases covered; parameterized where applicable\\nCommon Failures: Check for mixed responsibilities, type ambiguity, nested conditionals >2 deep, duplication, concrete dependencies\\nReview Pattern: Principle→Why→Fix (most critical first); iterate until all standards met\\nSummarize: type: what + principles after delivery\\nIV. Communication\\n\\nDirect, principle-based justification with trade-offs\\nCode examples > explanation; concrete > abstract\\n"
+  },
+  "githubPullRequests.experimental.chat": true,
+  "githubPullRequests.experimental.notificationsView": true,
+  "githubPullRequests.pullRequestDescription": "Copilot",
+  "editor.multiCursorModifier": "ctrlCmd",
+  "@azure.argTenant": "",
+  "geminicodeassist.chat.collapseCodeBlocksByDefault": true,
+  "gitHistory.hideCommitViewExplorer": true,
+  "powershell.sideBar.CommandExplorerVisibility": true,
+  "augment.nextEdit.showDiffInHover": true,
+  "terminal.integrated.profiles.windows": {
+    "PowerShell": {
+      "source": "PowerShell",
+      "icon": "terminal-powershell"
+    },
+    "Command Prompt": {
+      "path": [
+        "${env:windir}\\Sysnative\\cmd.exe",
+        "${env:windir}\\System32\\cmd.exe"
+      ],
+      "args": [],
+      "icon": "terminal-cmd"
+    },
+    "Git Bash": {
+      "source": "Git Bash"
+    },
+    "terminal:select": {
+      "path": "C:\\Program Files\\Git\\bin\\bash.exe",
+      "args": ["--login", "-i"]
+    }
+  },
+  "diffEditor.maxComputationTime": 0,
+  "roo-cline.allowedCommands": [
+    "npm test",
+    "npm install",
+    "tsc",
+    "git log",
+    "git diff",
+    "git show"
+  ],
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "problems.defaultViewMode": "table",
+  "terminal.integrated.copyOnSelection": true,
+  "terminal.integrated.cursorBlinking": true,
+  "terminal.integrated.scrollback": 1500,
+  "terminal.integrated.enableVisualBell": true,
+  "terminal.integrated.mouseWheelScrollSensitivity": 2,
+  "terminal.integrated.suggest.enabled": true,
+  "chat.editor.wordWrap": "on",
+  "chat.edits2.enabled": true,
+  "chat.tools.autoApprove": true,
+  "inlineChat.enableV2": true,
+  "github.copilot.chat.agent.thinkingTool": true
+}

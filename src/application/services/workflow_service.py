@@ -1,3 +1,4 @@
+################################################################################
 """Workflow service implementation for AutoQliq."""
 import logging
 import time
@@ -104,21 +105,18 @@ class WorkflowService(IWorkflowService):
         """Run a workflow, returning detailed execution results and logging them."""
         logger.info(f"SERVICE: Preparing run: WF='{name}', Cred='{credential_name}', Browser='{browser_type.value}'")
         driver: Optional[IWebDriver] = None
-        execution_log: Optional[Dict[str, Any]] = None # Initialize log dict
-
-        # Generate execution ID at the start (though filename depends on final status)
-        # execution_id = self.reporting_service.log_execution_start(name) # If using start log
+        execution_log: Optional[Dict[str, Any]] = None
 
         try:
             # 1. Load Actions
-            actions = self.get_workflow(name) # Uses internal method with logging/error handling
+            actions = self.get_workflow(name) # Uses internal method with error handling
 
-            # 2. Create Driver (using WebDriverService)
+            # 2. Create Driver
             driver = self.webdriver_service.create_web_driver(browser_type_str=browser_type.value)
 
             # 3. Create Runner and Execute
             runner = WorkflowRunner(driver, self.credential_repository, self.workflow_repository, stop_event)
-            # Runner now returns the full log dictionary
+            # Runner returns the full log dictionary
             execution_log = runner.run(actions, workflow_name=name)
 
             # 4. Return results (the log dict itself)
@@ -126,42 +124,35 @@ class WorkflowService(IWorkflowService):
             return execution_log
 
         except (WorkflowError, CredentialError, WebDriverError, ActionError, ValidationError, RepositoryError, SerializationError, ConfigError, AutoQliqError) as e:
-             # Catch known errors during setup or execution if runner re-raises them unexpectedly
-             logger.error(f"SERVICE: Error during workflow '{name}' execution setup or run: {e}", exc_info=True)
-             # Create a basic log dict for failure if runner didn't provide one
-             if execution_log is None: # Should not happen if runner's finally block works
+             logger.error(f"SERVICE: Error during workflow '{name}' execution: {e}", exc_info=True)
+             # Create/update log dict for failure
+             if execution_log is None: # Error likely happened before runner finished
                   execution_log = { "workflow_name": name, "final_status": "FAILED", "error_message": str(e),
                                     "start_time_iso": datetime.now().isoformat(), "end_time_iso": datetime.now().isoformat(),
                                     "duration_seconds": 0.0, "action_results": [] }
-             else: # Update existing log if runner failed but returned partial log
+             else: # Runner failed but returned partial log
                   execution_log["final_status"] = "FAILED"
                   execution_log["error_message"] = str(e)
-             raise # Re-raise the original error for presenter to handle
-
+             raise # Re-raise the original specific error for presenter
         except Exception as e:
-             # Catch unexpected errors
              logger.exception(f"SERVICE: Unexpected error running workflow '{name}'")
              if execution_log is None:
                   execution_log = { "workflow_name": name, "final_status": "FAILED", "error_message": f"Unexpected error: {e}",
                                     "start_time_iso": datetime.now().isoformat(), "end_time_iso": datetime.now().isoformat(),
                                     "duration_seconds": 0.0, "action_results": [] }
              else:
-                  execution_log["final_status"] = "FAILED"
-                  execution_log["error_message"] = f"Unexpected error: {e}"
-             # Wrap in WorkflowError before re-raising
+                  execution_log["final_status"] = "FAILED"; execution_log["error_message"] = f"Unexpected error: {e}"
              raise WorkflowError(f"Unexpected error running workflow '{name}'", workflow_name=name, cause=e) from e
-
         finally:
-            # 5. Ensure WebDriver Cleanup (using WebDriverService)
+            # 5. Ensure WebDriver Cleanup
             if driver:
                 try: self.webdriver_service.dispose_web_driver(driver)
                 except Exception as q_e: logger.error(f"SERVICE: Error disposing WebDriver: {q_e}", exc_info=True)
-            # 6. Save Execution Log (using ReportingService)
+            # 6. Save Execution Log
             if execution_log:
                  try: self.reporting_service.save_execution_log(execution_log)
-                 except Exception as log_e: logger.error(f"SERVICE: Failed to save execution log for '{name}': {log_e}", exc_info=True)
-            else:
-                 logger.error(f"SERVICE: No execution log generated for workflow '{name}' run, cannot save log.")
+                 except Exception as log_e: logger.error(f"SERVICE: Failed save execution log for '{name}': {log_e}", exc_info=True)
+            else: logger.error(f"SERVICE: No execution log generated for '{name}', cannot save log.")
 
 
     @log_method_call(logger)
@@ -172,3 +163,8 @@ class WorkflowService(IWorkflowService):
         metadata = self.workflow_repository.get_metadata(name)
         logger.debug(f"SERVICE: Metadata retrieved for workflow '{name}'.")
         return metadata
+
+# Need datetime for finally block if execution_log is None
+from datetime import datetime
+
+################################################################################

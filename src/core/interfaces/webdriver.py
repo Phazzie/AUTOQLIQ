@@ -1,3 +1,4 @@
+################################################################################
 """WebDriver interface for AutoQliq.
 
 This module defines the interface for web driver implementations that provide
@@ -99,3 +100,4 @@ class IWebDriver(abc.ABC):
     def get_alert_text(self) -> str:
         """Get the text content of an alert, confirm, or prompt dialog."""
         pass
+################################################################################

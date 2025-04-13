@@ -1,3 +1,4 @@
+################################################################################
 """Core Service interfaces for AutoQliq.
 
 Defines the contracts for the application service layer, which orchestrates
@@ -221,3 +222,5 @@ class IReportingService(IService):
         pass
 
     # Optional: methods for cleaning up old execution logs
+
+################################################################################

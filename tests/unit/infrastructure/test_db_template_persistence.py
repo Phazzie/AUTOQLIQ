@@ -1,3 +1,4 @@
+################################################################################
 """Unit tests for the DatabaseWorkflowRepository template methods."""
 
 import unittest
@@ -24,6 +25,7 @@ class TestDatabaseTemplatePersistence(unittest.TestCase):
         self.mock_conn_manager.get_connection.return_value = self.mock_conn
         self.mock_conn_manager.transaction.return_value.__enter__.return_value = self.mock_conn
         self.mock_conn.cursor.return_value = self.mock_cursor
+        # Simulate successful table creation/existence check initially
         self.mock_conn_manager.create_table.return_value = None
         self.mock_conn_manager.table_exists.return_value = True
 
@@ -31,6 +33,7 @@ class TestDatabaseTemplatePersistence(unittest.TestCase):
         self.mock_conn_manager_class = self.conn_manager_patcher.start()
         self.mock_conn_manager_class.return_value = self.mock_conn_manager
 
+        # Patch the base validator used for IDs
         self.base_validator_patcher = patch('src.infrastructure.repositories.base.database_repository.EntityValidator')
         self.mock_base_validator = self.base_validator_patcher.start()
         self.mock_base_validator.validate_entity_id.return_value = None
@@ -80,20 +83,15 @@ class TestDatabaseTemplatePersistence(unittest.TestCase):
         self.assertIsInstance(params[2], str) # created_at
         self.assertIsInstance(params[3], str) # modified_at
         # Check update params (actions_json, modified_at)
-        self.assertEqual(params[4], actions_json)
-        self.assertEqual(params[5], params[3]) # modified_at should be the same
-
+        self.assertEqual(params[4], actions_json); self.assertEqual(params[5], params[3])
 
     def test_save_template_update(self):
         """Test saving an existing template updates it."""
         name = "tmpl1"; data = [{"type":"B"}]; actions_json = json.dumps(data)
         self.mock_conn_manager.execute_modification.return_value = 1 # Simulate update
-
         self.repository.save_template(name, data) # Should trigger UPSERT's update path
-
         self.mock_base_validator.validate_entity_id.assert_called_once_with(name, entity_type="Template")
         self.mock_conn_manager.execute_modification.assert_called_once()
-        # Query/params are the same for UPSERT, DB handles the update part
 
     def test_save_template_invalid_data(self):
         """Test saving template with non-list data raises SerializationError."""
@@ -105,9 +103,7 @@ class TestDatabaseTemplatePersistence(unittest.TestCase):
         name = "tmpl_load"; actions_data = [{"type":"C"}]; actions_json = json.dumps(actions_data)
         db_row = {"actions_json": actions_json}
         self.mock_conn_manager.execute_query.return_value = [db_row]
-
         result = self.repository.load_template(name)
-
         self.mock_base_validator.validate_entity_id.assert_called_once_with(name, entity_type="Template")
         expected_query = f"SELECT actions_json FROM {self.repository._TMPL_TABLE_NAME} WHERE {self.repository._TMPL_PK_COLUMN} = ?"
         self.mock_conn_manager.execute_query.assert_called_once_with(expected_query, (name,))
@@ -127,8 +123,7 @@ class TestDatabaseTemplatePersistence(unittest.TestCase):
     def test_delete_template_success(self):
         """Test deleting an existing template."""
         name = "tmpl_del"; self.mock_conn_manager.execute_modification.return_value = 1
-        result = self.repository.delete_template(name)
-        self.assertTrue(result)
+        result = self.repository.delete_template(name); self.assertTrue(result)
         self.mock_base_validator.validate_entity_id.assert_called_once_with(name, entity_type="Template")
         expected_query = f"DELETE FROM {self.repository._TMPL_TABLE_NAME} WHERE {self.repository._TMPL_PK_COLUMN} = ?"
         self.mock_conn_manager.execute_modification.assert_called_once_with(expected_query, (name,))
@@ -150,3 +145,5 @@ class TestDatabaseTemplatePersistence(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main(argv=['first-arg-is-ignored'], exit=False)
+
+################################################################################
