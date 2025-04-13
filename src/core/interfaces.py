@@ -1,4 +1,4 @@
-"""Core interfaces consolidation for AutoQliq."""
+﻿"""Core interfaces consolidation for AutoQliq."""
 
 # This file serves as a central point for importing core interfaces.
 # Individual interface definitions are in the src.core.interfaces package.
@@ -12,6 +12,7 @@ from src.core.action_result import ActionResult
 from src.core.interfaces.action import IAction
 from src.core.interfaces.repository import IWorkflowRepository, ICredentialRepository
 from src.core.interfaces.webdriver import IWebDriver
+from src.core.interfaces.entity_interfaces import IWorkflow, ICredential
 
 
 __all__ = [
@@ -19,6 +20,8 @@ __all__ = [
     "IWorkflowRepository",
     "ICredentialRepository",
     "IWebDriver",
+    "IWorkflow",
+    "ICredential",
     "ActionResult" # Export ActionResult as well
 ]
 
