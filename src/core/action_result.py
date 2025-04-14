@@ -49,8 +49,13 @@ class ActionResult:
         self.status = status
         self.message = message
         self.data = data or {}
-        # Log creation, mask sensitive data if necessary in the future
-        logger.info(f"ActionResult created: Status={self.status.name}, Message='{self.message}'")
+
+        # Log creation with masked sensitive data
+        log_data = self._filter_sensitive_data(self.data.copy()) if self.data else {}
+        logger.info(
+            f"ActionResult created: Status={self.status.name}, "
+            f"Message='{self.message}', Data={log_data}"
+        )
 
     def is_success(self) -> bool:
         """
@@ -62,7 +67,11 @@ class ActionResult:
         return self.status == ActionStatus.SUCCESS
 
     @classmethod
-    def success(cls, message: Optional[str] = None, data: Optional[Dict[str, Any]] = None) -> 'ActionResult':
+    def success(
+        cls,
+        message: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None
+    ) -> 'ActionResult':
         """
         Create a success result.
 
@@ -77,7 +86,11 @@ class ActionResult:
         return cls(ActionStatus.SUCCESS, message, data)
 
     @classmethod
-    def failure(cls, message: str = "Action failed", data: Optional[Dict[str, Any]] = None) -> 'ActionResult':
+    def failure(
+        cls,
+        message: str = "Action failed",
+        data: Optional[Dict[str, Any]] = None
+    ) -> 'ActionResult':
         """
         Create a failure result.
 
@@ -121,7 +134,10 @@ class ActionResult:
         try:
             status = ActionStatus(status_value) if status_value else ActionStatus.FAILURE
         except ValueError:
-            logger.error(f"Invalid status value '{status_value}' encountered in from_dict. Defaulting to FAILURE.")
+            logger.error(
+                f"Invalid status value '{status_value}' encountered in from_dict. "
+                f"Defaulting to FAILURE."
+            )
             status = ActionStatus.FAILURE
 
         return cls(
@@ -147,6 +163,31 @@ class ActionResult:
         Get a developer-friendly string representation of the result.
 
         Returns:
-            A string representation of the result instance.
+            A string representation of the result instance with masked sensitive data.
         """
-        return f"ActionResult(status={self.status}, message='{self.message}', data={self.data})"
+        # Mask sensitive data in the representation
+        safe_data = self._filter_sensitive_data(self.data.copy()) if self.data else {}
+        return f"ActionResult(status={self.status}, message='{self.message}', data={safe_data})"
+
+    def _filter_sensitive_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Filter out sensitive data from the result data.
+
+        Args:
+            data: The data to filter
+
+        Returns:
+            Dict[str, Any]: Filtered data
+        """
+        # List of keys that might contain sensitive information
+        sensitive_keys = ["password", "token", "secret", "key", "credential", "auth"]
+
+        # Remove or mask sensitive data
+        for key in list(data.keys()):
+            if any(sensitive_word in key.lower() for sensitive_word in sensitive_keys):
+                data[key] = "********"  # Mask sensitive data
+            elif isinstance(data[key], dict):
+                # Recursively filter nested dictionaries
+                data[key] = self._filter_sensitive_data(data[key])
+
+        return data
