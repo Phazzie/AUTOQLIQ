@@ -6,19 +6,32 @@ execution, and management.
 Exports:
     WorkflowRunner: Class responsible for executing a sequence of actions.
     Workflow: Core entity representing a sequence of actions.
-    # Add other relevant exports as the package grows, e.g.,
-    # WorkflowErrorHandler, CredentialManager
+    RefactoredWorkflowRunner: Refactored version of WorkflowRunner with improved modularity.
 """
 
-from .runner import WorkflowRunner
+# For backward compatibility, import the original WorkflowRunner
+from .runner import WorkflowRunner, ErrorHandlingStrategy
 from .workflow_entity import Workflow
-# Placeholder imports for potentially future components
-# from .error_handler import WorkflowErrorHandler
-# from .credential_manager import CredentialManager
+
+# Import the refactored components
+from .runner_refactored import WorkflowRunner as RefactoredWorkflowRunner
+from .backward_compatibility import WorkflowRunner as CompatibleWorkflowRunner
+
+# Import specialized components
+from .action_executor import ActionExecutor
+from .context.manager import WorkflowContextManager
+from .result_processing.processor import ResultProcessor
 
 __all__ = [
+    # Original components
     "WorkflowRunner",
     "Workflow",
-    # "WorkflowErrorHandler",
-    # "CredentialManager",
+    "ErrorHandlingStrategy",
+
+    # Refactored components
+    "RefactoredWorkflowRunner",
+    "CompatibleWorkflowRunner",
+    "ActionExecutor",
+    "WorkflowContextManager",
+    "ResultProcessor",
 ]
