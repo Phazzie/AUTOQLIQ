@@ -1,14 +1,15 @@
-################################################################################
+﻿################################################################################
 """Repository interfaces for AutoQliq.
 
 This module defines the interfaces for repository implementations that provide
 storage and retrieval capabilities for workflows and credentials.
 """
 import abc
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
-# Assuming IAction is defined elsewhere
-from src.core.interfaces.action import IAction
+# Use TYPE_CHECKING to avoid circular imports
+if TYPE_CHECKING:
+    from src.core.interfaces.action import IAction
 
 
 class IWorkflowRepository(abc.ABC):
@@ -16,12 +17,12 @@ class IWorkflowRepository(abc.ABC):
 
     # --- Workflow Operations ---
     @abc.abstractmethod
-    def save(self, name: str, workflow_actions: List[IAction]) -> None:
+    def save(self, name: str, workflow_actions: List["IAction"]) -> None:
         """Save (create or update) a workflow."""
         pass
 
     @abc.abstractmethod
-    def load(self, name: str) -> List[IAction]:
+    def load(self, name: str) -> List["IAction"]:
         """Load a workflow by name. Raises RepositoryError if not found."""
         pass
 

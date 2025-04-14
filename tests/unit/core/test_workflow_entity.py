@@ -1,17 +1,19 @@
+﻿"""Tests for the Workflow entity module."""
+
 import unittest
 from unittest.mock import Mock, patch
 import json
 from typing import List, Dict, Any
 
-from src.core.interfaces import IAction, IWebDriver
-from src.core.workflow_entity import Workflow
-from src.core.action_result import ActionResult, ActionStatus
+from src.core.interfaces import IAction, IWorkflow
+from src.core.workflow.workflow_entity import Workflow
+from src.core.exceptions import ValidationError
 
 
 class TestWorkflowEntity(unittest.TestCase):
     """
     Tests for the Workflow entity to ensure it properly manages
-    a sequence of actions and their execution.
+    a sequence of actions.
     """
 
     def setUp(self):
@@ -20,15 +22,12 @@ class TestWorkflowEntity(unittest.TestCase):
         self.action1 = Mock(spec=IAction)
         self.action1.name = "Action1"
         self.action1.to_dict.return_value = {"type": "TestAction", "name": "Action1"}
-        self.action1.execute.return_value = ActionResult(ActionStatus.SUCCESS)
+        self.action1.validate.return_value = True
 
         self.action2 = Mock(spec=IAction)
         self.action2.name = "Action2"
         self.action2.to_dict.return_value = {"type": "TestAction", "name": "Action2"}
-        self.action2.execute.return_value = ActionResult(ActionStatus.SUCCESS)
-
-        # Create a mock driver
-        self.driver = Mock(spec=IWebDriver)
+        self.action2.validate.return_value = True
 
     def test_initialization_with_name_and_actions(self):
         """Test that a Workflow can be initialized with a name and actions."""
@@ -41,15 +40,34 @@ class TestWorkflowEntity(unittest.TestCase):
 
     def test_initialization_with_empty_actions(self):
         """Test that a Workflow can be initialized with an empty actions list."""
-        workflow = Workflow(name="empty_workflow", actions=[])
+        workflow = Workflow(name="empty_workflow")
 
         self.assertEqual(workflow.name, "empty_workflow")
         self.assertEqual(len(workflow.actions), 0)
 
+    def test_initialization_with_description_and_metadata(self):
+        """Test that a Workflow can be initialized with description and metadata."""
+        metadata = {"created_by": "test_user", "tags": ["test", "example"]}
+        workflow = Workflow(
+            name="test_workflow",
+            actions=[self.action1],
+            description="Test workflow description",
+            metadata=metadata
+        )
+
+        self.assertEqual(workflow.name, "test_workflow")
+        self.assertEqual(workflow.description, "Test workflow description")
+        self.assertEqual(workflow.metadata, metadata)
+
     def test_validation_empty_name(self):
         """Test that a Workflow cannot be created with an empty name."""
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValidationError):
             Workflow(name="", actions=[self.action1])
+
+    def test_validation_non_action_object(self):
+        """Test that a Workflow cannot be created with non-IAction objects."""
+        with self.assertRaises(ValidationError):
+            Workflow(name="test_workflow", actions=[self.action1, "not_an_action"])
 
     def test_add_action(self):
         """Test that actions can be added to a workflow."""
@@ -61,6 +79,13 @@ class TestWorkflowEntity(unittest.TestCase):
         self.assertEqual(len(workflow.actions), 2)
         self.assertEqual(workflow.actions[0], self.action1)
         self.assertEqual(workflow.actions[1], self.action2)
+
+    def test_add_non_action(self):
+        """Test that non-IAction objects cannot be added to a workflow."""
+        workflow = Workflow(name="test_workflow", actions=[self.action1])
+
+        with self.assertRaises(ValidationError):
+            workflow.add_action("not_an_action")
 
     def test_remove_action(self):
         """Test that actions can be removed from a workflow."""
@@ -76,49 +101,38 @@ class TestWorkflowEntity(unittest.TestCase):
         with self.assertRaises(IndexError):
             workflow.remove_action(10)
 
-    def test_execute(self):
-        """Test that a workflow can execute all its actions."""
+    def test_validate(self):
+        """Test that a workflow can validate itself and its actions."""
         workflow = Workflow(name="test_workflow", actions=[self.action1, self.action2])
 
-        # Execute the workflow
-        results = workflow.execute(self.driver)
+        # Validate the workflow
+        self.assertTrue(workflow.validate())
 
-        # Verify that all actions were executed
-        self.action1.execute.assert_called_once_with(self.driver)
-        self.action2.execute.assert_called_once_with(self.driver)
+        # Test validation with a failing action
+        self.action2.validate.side_effect = ValidationError("Action validation failed")
 
-        # Verify the results
-        self.assertEqual(len(results), 2)
-        self.assertTrue(results[0].is_success())
-        self.assertTrue(results[1].is_success())
+        with self.assertRaises(ValidationError) as context:
+            workflow.validate()
 
-    def test_execute_with_failure(self):
-        """Test that a workflow stops execution when an action fails."""
-        # Make the second action fail
-        self.action2.execute.return_value = ActionResult(ActionStatus.FAILURE, "Action failed")
-
-        workflow = Workflow(name="test_workflow", actions=[self.action1, self.action2])
-
-        # Execute the workflow
-        results = workflow.execute(self.driver)
-
-        # Verify that all actions were executed
-        self.action1.execute.assert_called_once_with(self.driver)
-        self.action2.execute.assert_called_once_with(self.driver)
-
-        # Verify the results
-        self.assertEqual(len(results), 2)
-        self.assertTrue(results[0].is_success())
-        self.assertFalse(results[1].is_success())
-        self.assertEqual(results[1].message, "Action failed")
+        self.assertIn("Action at index 1", str(context.exception))
+        self.assertIn("Action validation failed", str(context.exception))
 
     def test_to_dict(self):
         """Test that a workflow can be serialized to a dictionary."""
-        workflow = Workflow(name="test_workflow", actions=[self.action1, self.action2])
+        workflow = Workflow(
+            name="test_workflow",
+            actions=[self.action1, self.action2],
+            description="Test description",
+            workflow_id="test-id",
+            metadata={"key": "value"}
+        )
 
         result = workflow.to_dict()
 
+        self.assertEqual(result["id"], "test-id")
         self.assertEqual(result["name"], "test_workflow")
+        self.assertEqual(result["description"], "Test description")
+        self.assertEqual(result["metadata"], {"key": "value"})
         self.assertEqual(len(result["actions"]), 2)
         self.assertEqual(result["actions"][0], {"type": "TestAction", "name": "Action1"})
         self.assertEqual(result["actions"][1], {"type": "TestAction", "name": "Action2"})
@@ -135,56 +149,109 @@ class TestWorkflowEntity(unittest.TestCase):
         self.assertEqual(data["actions"][0], {"type": "TestAction", "name": "Action1"})
         self.assertEqual(data["actions"][1], {"type": "TestAction", "name": "Action2"})
 
-    def test_from_dict(self):
-        """Test that a workflow can be created from a dictionary."""
-        # We need to patch the ActionFactory to return our mock actions
-        with patch("src.core.workflow_entity.ActionFactory") as mock_factory:
-            mock_factory.create_action.side_effect = [self.action1, self.action2]
+    def test_from_dict_with_factory(self):
+        """Test that a workflow can be created from a dictionary using a factory."""
+        # Create a mock action factory
+        mock_factory = Mock()
+        mock_factory.create_action.side_effect = [self.action1, self.action2]
 
-            data = {
-                "name": "test_workflow",
-                "actions": [
-                    {"type": "TestAction", "name": "Action1"},
-                    {"type": "TestAction", "name": "Action2"}
-                ]
-            }
+        data = {
+            "name": "test_workflow",
+            "description": "Test description",
+            "id": "test-id",
+            "actions": [
+                {"type": "TestAction", "name": "Action1"},
+                {"type": "TestAction", "name": "Action2"}
+            ],
+            "metadata": {"key": "value"}
+        }
 
-            workflow = Workflow.from_dict(data)
+        workflow = Workflow.from_dict(data, action_factory=mock_factory)
 
-            self.assertEqual(workflow.name, "test_workflow")
-            self.assertEqual(len(workflow.actions), 2)
-            # Verify that ActionFactory was called correctly
-            mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action1"})
-            mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action2"})
+        self.assertEqual(workflow.id, "test-id")
+        self.assertEqual(workflow.name, "test_workflow")
+        self.assertEqual(workflow.description, "Test description")
+        self.assertEqual(workflow.metadata, {"key": "value"})
+        self.assertEqual(len(workflow.actions), 2)
+
+        # Verify that ActionFactory was called correctly
+        mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action1"})
+        mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action2"})
+
+    def test_from_dict_without_factory(self):
+        """Test that a workflow can be created from a dictionary with pre-instantiated actions."""
+        data = {
+            "name": "test_workflow",
+            "actions": [self.action1, self.action2],
+            "description": "Test description",
+            "id": "test-id",
+            "metadata": {"key": "value"}
+        }
+
+        workflow = Workflow.from_dict(data)
+
+        self.assertEqual(workflow.id, "test-id")
+        self.assertEqual(workflow.name, "test_workflow")
+        self.assertEqual(workflow.description, "Test description")
+        self.assertEqual(workflow.metadata, {"key": "value"})
+        self.assertEqual(len(workflow.actions), 2)
+        self.assertEqual(workflow.actions[0], self.action1)
+        self.assertEqual(workflow.actions[1], self.action2)
+
+    def test_from_dict_missing_name(self):
+        """Test that from_dict raises ValidationError when name is missing."""
+        data = {
+            "actions": [self.action1, self.action2]
+        }
+
+        with self.assertRaises(ValidationError):
+            Workflow.from_dict(data)
+
+    def test_from_dict_missing_factory(self):
+        """Test that from_dict raises ValidationError when factory is needed but not provided."""
+        data = {
+            "name": "test_workflow",
+            "actions": [
+                {"type": "TestAction", "name": "Action1"},
+                {"type": "TestAction", "name": "Action2"}
+            ]
+        }
+
+        with self.assertRaises(ValidationError):
+            Workflow.from_dict(data)
 
     def test_from_json(self):
         """Test that a workflow can be created from JSON."""
-        # We need to patch the ActionFactory to return our mock actions
-        with patch("src.core.workflow_entity.ActionFactory") as mock_factory:
-            mock_factory.create_action.side_effect = [self.action1, self.action2]
+        # Create a mock action factory
+        mock_factory = Mock()
+        mock_factory.create_action.side_effect = [self.action1, self.action2]
 
-            json_str = json.dumps({
-                "name": "test_workflow",
-                "actions": [
-                    {"type": "TestAction", "name": "Action1"},
-                    {"type": "TestAction", "name": "Action2"}
-                ]
-            })
+        json_str = json.dumps({
+            "name": "test_workflow",
+            "actions": [
+                {"type": "TestAction", "name": "Action1"},
+                {"type": "TestAction", "name": "Action2"}
+            ]
+        })
 
-            workflow = Workflow.from_json(json_str)
+        workflow = Workflow.from_json(json_str, action_factory=mock_factory)
 
-            self.assertEqual(workflow.name, "test_workflow")
-            self.assertEqual(len(workflow.actions), 2)
-            # Verify that ActionFactory was called correctly
-            mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action1"})
-            mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action2"})
+        self.assertEqual(workflow.name, "test_workflow")
+        self.assertEqual(len(workflow.actions), 2)
+
+        # Verify that ActionFactory was called correctly
+        mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action1"})
+        mock_factory.create_action.assert_any_call({"type": "TestAction", "name": "Action2"})
 
     def test_string_representation(self):
         """Test that a workflow has a meaningful string representation."""
-        workflow = Workflow(name="test_workflow", actions=[self.action1, self.action2])
+        workflow = Workflow(
+            name="test_workflow",
+            actions=[self.action1, self.action2],
+            workflow_id="test-id"
+        )
 
-        expected_str = "Workflow(name='test_workflow', actions=2)"
-
+        expected_str = "Workflow(id=test-id, name=test_workflow, actions=2)"
         self.assertEqual(str(workflow), expected_str)
 
 
