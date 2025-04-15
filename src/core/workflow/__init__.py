@@ -10,7 +10,7 @@ Exports:
 """
 
 # For backward compatibility, import the original WorkflowRunner
-from .runner import WorkflowRunner, ErrorHandlingStrategy
+from .runner import WorkflowRunner
 from .workflow_entity import Workflow
 
 # Import the refactored components
@@ -26,7 +26,6 @@ __all__ = [
     # Original components
     "WorkflowRunner",
     "Workflow",
-    "ErrorHandlingStrategy",
 
     # Refactored components
     "RefactoredWorkflowRunner",

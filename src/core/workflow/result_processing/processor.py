@@ -12,13 +12,10 @@ from src.core.workflow.result_processing.interfaces import (
     IStatusAnalyzer,
     ITimeMetricsCalculator,
     ILogStructureBuilder,
-    IWorkflowCompletionLogger
+    IWorkflowCompletionLogger,
+    IFactory
 )
-from src.core.workflow.result_processing.formatter import ResultFormatter
-from src.core.workflow.result_processing.status_analyzer import StatusAnalyzer
-from src.core.workflow.result_processing.time_metrics_calculator import TimeMetricsCalculator
-from src.core.workflow.result_processing.log_structure_builder import LogStructureBuilder
-from src.core.workflow.result_processing.workflow_completion_logger import WorkflowCompletionLogger
+from src.core.workflow.result_processing.factory import ComponentFactory
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +28,7 @@ class ResultProcessor:
     """
 
     def __init__(self,
+                factory: IFactory = None,
                 formatter: IResultFormatter = None,
                 status_analyzer: IStatusAnalyzer = None,
                 time_calculator: ITimeMetricsCalculator = None,
@@ -39,17 +37,21 @@ class ResultProcessor:
         """Initialize the result processor.
 
         Args:
+            factory: Optional factory for creating components
             formatter: Optional formatter for results
             status_analyzer: Optional analyzer for determining status
             time_calculator: Optional calculator for time metrics
             log_builder: Optional builder for log structure
             completion_logger: Optional logger for workflow completion
         """
-        self._formatter = formatter or ResultFormatter()
-        self._status_analyzer = status_analyzer or StatusAnalyzer()
-        self._time_calculator = time_calculator or TimeMetricsCalculator()
-        self._log_builder = log_builder or LogStructureBuilder()
-        self._completion_logger = completion_logger or WorkflowCompletionLogger()
+        self._factory = factory or ComponentFactory()
+
+        # Initialize components using factory if not provided
+        self._formatter = formatter or self._factory.create(IResultFormatter)
+        self._status_analyzer = status_analyzer or self._factory.create(IStatusAnalyzer)
+        self._time_calculator = time_calculator or self._factory.create(ITimeMetricsCalculator)
+        self._log_builder = log_builder or self._factory.create(ILogStructureBuilder)
+        self._completion_logger = completion_logger or self._factory.create(IWorkflowCompletionLogger)
 
     def create_execution_log(self,
                             workflow_name: str,
