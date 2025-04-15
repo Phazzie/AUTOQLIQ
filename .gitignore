@@ -19,6 +19,7 @@ ENV/
 
 # Logs
 *.log
+logs/
 
 # Database files
 *.db
@@ -28,6 +29,8 @@ temp/
 test_apply/
 test_apply_enhanced/
 test_package/
+exports/
+context_export_*/
 
 # Packaging output
 *.txt
