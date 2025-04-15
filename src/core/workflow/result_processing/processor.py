@@ -4,7 +4,7 @@ This module provides the ResultProcessor class for processing workflow execution
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 
 from src.core.action_result import ActionResult
 from src.core.workflow.result_processing.interfaces import (
@@ -100,5 +100,3 @@ class ResultProcessor:
         )
 
         return execution_log
-
-
