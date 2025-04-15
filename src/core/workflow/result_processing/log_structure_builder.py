@@ -6,16 +6,18 @@ This module provides the LogStructureBuilder class for building execution log st
 import logging
 from typing import Dict, Any, List, Optional
 
+from src.core.workflow.result_processing.interfaces import ILogStructureBuilder
+
 logger = logging.getLogger(__name__)
 
 
-class LogStructureBuilder:
+class LogStructureBuilder(ILogStructureBuilder):
     """
     Builds structured execution log dictionaries.
-    
+
     Responsible for creating the structured execution log dictionary.
     """
-    
+
     def create_log_structure(self,
                            workflow_name: str,
                            time_metrics: Dict[str, Any],
@@ -26,7 +28,7 @@ class LogStructureBuilder:
                            formatted_results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Create the structured execution log dictionary.
-        
+
         Args:
             workflow_name: Name of the workflow
             time_metrics: Time-related metrics
@@ -35,7 +37,7 @@ class LogStructureBuilder:
             summary: Summary of the workflow execution
             error_strategy_name: Name of the error handling strategy
             formatted_results: Formatted action results
-            
+
         Returns:
             Dict[str, Any]: Structured execution log
         """

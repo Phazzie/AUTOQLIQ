@@ -26,6 +26,3 @@ __all__ = [
     "PlaywrightDriver",
     "handle_driver_exceptions",
 ]
-```
-
-```text

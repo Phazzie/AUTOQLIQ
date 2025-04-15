@@ -13,6 +13,7 @@ from src.core.action_result import ActionResult
 from src.core.exceptions import ActionError, WorkflowError
 from src.core.actions.loop_action import LoopAction
 from src.core.workflow.control_flow.base import ControlFlowHandlerBase
+from src.core.workflow.control_flow.interfaces import ILoopActionHandler
 from src.core.workflow.control_flow.loop_handlers import (
     CountLoopHandler,
     ForEachLoopHandler,
@@ -23,7 +24,7 @@ from src.core.workflow.control_flow.loop_handlers import (
 logger = logging.getLogger(__name__)
 
 
-class LoopHandler(ControlFlowHandlerBase):
+class LoopHandler(ControlFlowHandlerBase, ILoopActionHandler):
     """Handler for LoopAction execution."""
 
     def __init__(self, *args, **kwargs):
@@ -176,3 +177,49 @@ class LoopHandler(ControlFlowHandlerBase):
             action_type=action.action_type,
             cause=error
         )
+
+    def get_loop_items(self, loop_type: str, loop_source: Any, context: Dict[str, Any]) -> List[Any]:
+        """Get the items to loop over.
+
+        Args:
+            loop_type: The type of loop
+            loop_source: The source of loop items
+            context: The execution context
+
+        Returns:
+            List[Any]: The items to loop over
+        """
+        # Get the appropriate handler
+        handler = self.loop_handlers.get(loop_type)
+        if not handler:
+            raise ActionError(f"Unsupported loop_type '{loop_type}'")
+
+        # Delegate to the specific handler
+        if loop_type == "count":
+            # For count loops, create a list of integers
+            try:
+                count = int(loop_source)
+                return list(range(count))
+            except (ValueError, TypeError) as e:
+                raise ActionError(f"Invalid count value: {loop_source}") from e
+
+        elif loop_type == "for_each":
+            # For for_each loops, get the items from the source
+            if isinstance(loop_source, list):
+                return loop_source
+            elif isinstance(loop_source, str) and loop_source in context:
+                items = context.get(loop_source)
+                if isinstance(items, list):
+                    return items
+                else:
+                    raise ActionError(f"Loop source '{loop_source}' is not a list")
+            else:
+                raise ActionError(f"Invalid for_each source: {loop_source}")
+
+        elif loop_type == "while":
+            # For while loops, we don't pre-compute the items
+            # Just return an empty list as a placeholder
+            return []
+
+        # Should never get here due to the check above
+        raise ActionError(f"Unsupported loop_type '{loop_type}'")

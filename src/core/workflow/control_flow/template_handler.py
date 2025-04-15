@@ -12,70 +12,71 @@ from src.core.exceptions import ActionError, WorkflowError, RepositoryError
 from src.core.actions.template_action import TemplateAction
 from src.core.actions.factory import ActionFactory
 from src.core.workflow.control_flow.base import ControlFlowHandlerBase
+from src.core.workflow.control_flow.interfaces import ITemplateActionHandler
 
 logger = logging.getLogger(__name__)
 
 
-class TemplateHandler(ControlFlowHandlerBase):
+class TemplateHandler(ControlFlowHandlerBase, ITemplateActionHandler):
     """Handler for TemplateAction expansion and execution."""
-    
+
     def __init__(self, *args, **kwargs):
         """
         Initialize the template handler.
-        
+
         Args:
             *args: Arguments to pass to the parent constructor
             **kwargs: Keyword arguments to pass to the parent constructor
         """
         super().__init__(*args, **kwargs)
         self.action_factory = ActionFactory()
-    
-    def handle(self, action: IAction, context: Dict[str, Any], 
+
+    def handle(self, action: IAction, context: Dict[str, Any],
               workflow_name: str, log_prefix: str) -> ActionResult:
         """
         Handle a TemplateAction by expanding it and executing the resulting actions.
-        
+
         Args:
             action: The TemplateAction to handle
             context: The execution context
             workflow_name: Name of the workflow being executed
             log_prefix: Prefix for log messages
-            
+
         Returns:
             ActionResult: The result of handling the action
-            
+
         Raises:
             ActionError: If an error occurs during handling
             WorkflowError: If action is not a TemplateAction or workflow_repo is None
         """
         if not isinstance(action, TemplateAction):
             raise WorkflowError(f"TemplateHandler received non-TemplateAction: {type(action).__name__}")
-        
+
         if not self.workflow_repo:
             raise WorkflowError(
                 f"Cannot expand template '{action.template_name}': No workflow repository available",
                 workflow_name=workflow_name
             )
-        
+
         try:
             # Load the template actions
             logger.info(f"{log_prefix}Expanding template '{action.template_name}'")
             template_actions = self._load_template(action.template_name)
-            
+
             if not template_actions:
                 logger.warning(f"{log_prefix}Template '{action.template_name}' is empty")
                 return ActionResult.success(f"Template '{action.template_name}' expanded to 0 actions")
-            
+
             # Apply parameter substitutions if any
             if action.parameters:
                 template_actions = self._apply_parameters(template_actions, action.parameters)
-            
+
             # Execute the expanded template actions
             template_prefix = f"{log_prefix}Template '{action.template_name}': "
             template_results = self.execute_actions(
                 template_actions, context, workflow_name, template_prefix
             )
-            
+
             # Return success if all template actions succeeded
             all_success = all(result.is_success() for result in template_results)
             if all_success:
@@ -87,7 +88,7 @@ class TemplateHandler(ControlFlowHandlerBase):
                 return ActionResult.failure(
                     f"Template '{action.template_name}' had failures ({len(template_results)} actions)"
                 )
-                
+
         except RepositoryError as e:
             raise ActionError(
                 f"Failed to load template '{action.template_name}': {e}",
@@ -106,17 +107,17 @@ class TemplateHandler(ControlFlowHandlerBase):
                 action_type=action.action_type,
                 cause=e
             ) from e
-    
+
     def _load_template(self, template_name: str) -> List[IAction]:
         """
         Load a template from the workflow repository.
-        
+
         Args:
             template_name: Name of the template to load
-            
+
         Returns:
             List[IAction]: The actions in the template
-            
+
         Raises:
             RepositoryError: If the template cannot be loaded
         """
@@ -127,38 +128,38 @@ class TemplateHandler(ControlFlowHandlerBase):
                 f"Failed to load template '{template_name}': {e}",
                 cause=e
             ) from e
-    
+
     def _apply_parameters(self, actions: List[IAction], parameters: Dict[str, Any]) -> List[IAction]:
         """
         Apply parameter substitutions to template actions.
-        
+
         Args:
             actions: The actions to apply parameters to
             parameters: The parameters to apply
-            
+
         Returns:
             List[IAction]: The actions with parameters applied
-            
+
         Raises:
             ActionError: If parameter substitution fails
         """
         # Serialize actions to dictionaries
         action_dicts = [action.to_dict() for action in actions]
-        
+
         # Apply parameter substitutions to serialized actions
         for action_dict in action_dicts:
             self._substitute_parameters_in_dict(action_dict, parameters)
-        
+
         # Deserialize back to actions
         try:
             return [self.action_factory.create_action(action_dict) for action_dict in action_dicts]
         except Exception as e:
             raise ActionError(f"Failed to apply template parameters: {e}", cause=e) from e
-    
+
     def _substitute_parameters_in_dict(self, data: Dict[str, Any], parameters: Dict[str, Any]) -> None:
         """
         Recursively substitute parameters in a dictionary.
-        
+
         Args:
             data: The dictionary to apply substitutions to
             parameters: The parameters to apply
@@ -181,3 +182,36 @@ class TemplateHandler(ControlFlowHandlerBase):
                             placeholder = f"{{{{{param_name}}}}}"
                             if placeholder in item:
                                 value[i] = item.replace(placeholder, str(param_value))
+
+    def expand_template(self, template_name: str, parameters: Dict[str, Any] = None) -> List[IAction]:
+        """
+        Expand a template into a list of actions.
+
+        Args:
+            template_name: The name of the template to expand
+            parameters: Optional parameters to apply to the template
+
+        Returns:
+            List[IAction]: The expanded template actions
+
+        Raises:
+            ActionError: If the template cannot be expanded
+            RepositoryError: If the template cannot be loaded
+        """
+        if not self.workflow_repo:
+            raise ActionError(
+                f"Cannot expand template '{template_name}': No workflow repository available"
+            )
+
+        # Load the template actions
+        template_actions = self._load_template(template_name)
+
+        if not template_actions:
+            logger.warning(f"Template '{template_name}' is empty")
+            return []
+
+        # Apply parameter substitutions if any
+        if parameters:
+            template_actions = self._apply_parameters(template_actions, parameters)
+
+        return template_actions

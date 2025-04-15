@@ -7,30 +7,32 @@ import logging
 import json
 from typing import Dict, Any, Optional, List
 
+from src.core.workflow.context.interfaces import IContextSerializer
+
 logger = logging.getLogger(__name__)
 
 
-class ContextSerializer:
+class ContextSerializer(IContextSerializer):
     """
     Serializes and deserializes workflow execution context.
-    
+
     Handles conversion between context dictionaries and serialized formats.
     """
-    
+
     def __init__(self):
         """Initialize the context serializer."""
         pass
-    
+
     def serialize_context(self, context: Dict[str, Any]) -> str:
         """
         Serialize a context dictionary to a JSON string.
-        
+
         Args:
             context: The execution context
-            
+
         Returns:
             str: The serialized context
-            
+
         Raises:
             ValueError: If the context cannot be serialized
         """
@@ -41,17 +43,17 @@ class ContextSerializer:
         except Exception as e:
             logger.error(f"Error serializing context: {e}")
             raise ValueError(f"Error serializing context: {e}") from e
-    
+
     def deserialize_context(self, serialized_context: str) -> Dict[str, Any]:
         """
         Deserialize a JSON string to a context dictionary.
-        
+
         Args:
             serialized_context: The serialized context
-            
+
         Returns:
             Dict[str, Any]: The deserialized context
-            
+
         Raises:
             ValueError: If the context cannot be deserialized
         """
@@ -60,14 +62,14 @@ class ContextSerializer:
         except Exception as e:
             logger.error(f"Error deserializing context: {e}")
             raise ValueError(f"Error deserializing context: {e}") from e
-    
+
     def _make_serializable(self, obj: Any) -> Any:
         """
         Make an object serializable by converting non-serializable types.
-        
+
         Args:
             obj: The object to make serializable
-            
+
         Returns:
             Any: The serializable object
         """

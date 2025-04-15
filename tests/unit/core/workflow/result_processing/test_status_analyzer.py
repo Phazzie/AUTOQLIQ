@@ -176,9 +176,27 @@ class TestStatusAnalyzer(unittest.TestCase):
         self.mock_error_analyzer.analyze_error.assert_called_once_with(self.generic_error)
         self.mock_result_analyzer.analyze_results.assert_not_called()
 
+    def test_determine_status_with_error_and_failures(self):
+        """Test determining status with both error and failures."""
+        # Set up mock return value
+        self.mock_error_analyzer.analyze_error.return_value = (
+            "FAILED", "Test action error", "Failed during action 'TestAction': Test action error"
+        )
 
+        # Call the method
+        status, error_message, summary = self.analyzer.determine_status(
+            action_results=self.results_with_failure,
+            error=self.action_error
+        )
 
+        # Verify the result
+        self.assertEqual(status, "FAILED")
+        self.assertEqual(error_message, "Test action error")
+        self.assertEqual(summary, "Failed during action 'TestAction': Test action error")
 
+        # Verify the mock was called - error should take precedence over failures
+        self.mock_error_analyzer.analyze_error.assert_called_once_with(self.action_error)
+        self.mock_result_analyzer.analyze_results.assert_not_called()
 
 
 if __name__ == "__main__":

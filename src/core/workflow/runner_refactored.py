@@ -69,6 +69,13 @@ class WorkflowRunner:
         if driver is None:
             raise ValueError("WebDriver instance cannot be None.")
 
+        # Validate error_strategy
+        if not isinstance(error_strategy, ErrorHandlingStrategy):
+            raise ValueError(
+                f"Invalid error strategy: {error_strategy}. "
+                f"Must be an ErrorHandlingStrategy enum value."
+            )
+
         # Store references
         self.driver = driver
         self.credential_repo = credential_repo
@@ -94,7 +101,9 @@ class WorkflowRunner:
             handler.set_execute_actions_func(self._execute_actions)
 
         # Initialize error handling strategy
-        strategy_type = "stop" if error_strategy == ErrorHandlingStrategy.STOP_ON_ERROR else "continue"
+        strategy_type = (
+            "stop" if error_strategy == ErrorHandlingStrategy.STOP_ON_ERROR else "continue"
+        )
         self.error_strategy = create_error_handling_strategy(strategy_type)
 
         # Log initialization
@@ -107,7 +116,11 @@ class WorkflowRunner:
             logger.debug("Stop event provided for cancellation check.")
         logger.debug(f"Using error handling strategy: {error_strategy.name}")
 
-    def run(self, actions: List[IAction], workflow_name: str = "Unnamed Workflow") -> Dict[str, Any]:
+    def run(
+        self,
+        actions: List[IAction],
+        workflow_name: str = "Unnamed Workflow"
+    ) -> Dict[str, Any]:
         """
         Execute actions sequentially, returning detailed log data.
 

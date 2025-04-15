@@ -4,18 +4,19 @@ This module provides the main context manager for workflow execution.
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 
 from src.core.workflow.context.base import ContextManager
 from src.core.workflow.context.variable_substitution import VariableSubstitutor
 from src.core.workflow.context.validator import ContextValidator
 from src.core.workflow.context.serializer import ContextSerializer
 from src.core.workflow.context.initializer import initialize_context
+from src.core.workflow.context.interfaces import IWorkflowContextManager
 
 logger = logging.getLogger(__name__)
 
 
-class WorkflowContextManager:
+class WorkflowContextManager(IWorkflowContextManager):
     """
     Main context manager for workflow execution.
 
@@ -102,3 +103,47 @@ class WorkflowContextManager:
             Dict[str, Any]: The dictionary with variables substituted
         """
         return self.variable_substitutor.substitute_variables_in_dict(data, context)
+
+    def validate_context(self, context: Dict[str, Any],
+                        required_keys: Optional[List[str]] = None) -> bool:
+        """
+        Validate that a context contains all required keys.
+
+        Args:
+            context: The execution context
+            required_keys: Optional list of keys that must be present
+
+        Returns:
+            bool: True if the context is valid, False otherwise
+        """
+        return self.validator.validate_context(context, required_keys)
+
+    def serialize_context(self, context: Dict[str, Any]) -> str:
+        """
+        Serialize a context dictionary to a JSON string.
+
+        Args:
+            context: The execution context
+
+        Returns:
+            str: The serialized context
+
+        Raises:
+            ValueError: If the context cannot be serialized
+        """
+        return self.serializer.serialize_context(context)
+
+    def deserialize_context(self, serialized_context: str) -> Dict[str, Any]:
+        """
+        Deserialize a JSON string to a context dictionary.
+
+        Args:
+            serialized_context: The serialized context
+
+        Returns:
+            Dict[str, Any]: The deserialized context
+
+        Raises:
+            ValueError: If the context cannot be deserialized
+        """
+        return self.serializer.deserialize_context(serialized_context)
