@@ -26,9 +26,7 @@ logs/
 
 # Temporary files
 temp/
-test_apply/
-test_apply_enhanced/
-test_package/
+test_data/
 exports/
 context_export_*/
 
@@ -38,8 +36,7 @@ context_export_*/
 
 # Backup files
 *_backup/
-script_backups_*/
-archived_packages/
+archive/
 
 # Test output
 .coverage

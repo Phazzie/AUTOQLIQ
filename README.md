@@ -20,6 +20,8 @@ AutoQliq/
 │   └── example_template.json   # Example template definition
 ├── logs/                         # Directory where execution logs are saved
 ├── exports/                      # Directory where context exports are saved
+├── test_data/                    # Directory for test data and samples
+├── archive/                      # Directory for archived content
 ├── autoqliq_data.db              # Example database file (if using database repo)
 ├── src/
 │   ├── __init__.py
