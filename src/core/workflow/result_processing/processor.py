@@ -72,19 +72,84 @@ class ResultProcessor:
         Returns:
             Dict[str, Any]: Detailed execution log
         """
-        # Calculate execution time metrics
-        time_metrics = self._time_calculator.calculate_time_metrics(start_time)
-
-        # Determine final status based on results and error
-        final_status, error_message, summary = self._status_analyzer.determine_status(
-            action_results, error
+        time_metrics = self._calculate_time_metrics(start_time)
+        final_status, error_message, summary = self._determine_status(action_results, error)
+        formatted_results = self._format_action_results(action_results)
+        execution_log = self._build_log_structure(
+            workflow_name,
+            time_metrics,
+            final_status,
+            error_message,
+            summary,
+            error_strategy_name,
+            formatted_results
         )
+        self._log_workflow_completion(workflow_name, final_status, error_message)
+        return execution_log
 
-        # Format action results for the log
-        formatted_results = self._formatter.format_action_results(action_results)
+    def _calculate_time_metrics(self, start_time: float) -> Dict[str, Any]:
+        """
+        Calculate execution time metrics.
 
-        # Create the execution log
-        execution_log = self._log_builder.create_log_structure(
+        Args:
+            start_time: Start time of the workflow execution (from time.time())
+
+        Returns:
+            Dict[str, Any]: Time metrics including end time, duration, and formatted timestamps
+        """
+        return self._time_calculator.calculate_time_metrics(start_time)
+
+    def _determine_status(self,
+                        action_results: List[ActionResult],
+                        error: Optional[Exception] = None) -> Tuple[str, Optional[str], str]:
+        """
+        Determine final status based on results and error.
+
+        Args:
+            action_results: Results of the executed actions
+            error: Optional exception that caused the workflow to fail
+
+        Returns:
+            Tuple[str, Optional[str], str]: Final status, error message, and summary
+        """
+        return self._status_analyzer.determine_status(action_results, error)
+
+    def _format_action_results(self, action_results: List[ActionResult]) -> List[Dict[str, Any]]:
+        """
+        Format action results for the log.
+
+        Args:
+            action_results: Results of the executed actions
+
+        Returns:
+            List[Dict[str, Any]]: Formatted action results
+        """
+        return self._formatter.format_action_results(action_results)
+
+    def _build_log_structure(self,
+                            workflow_name: str,
+                            time_metrics: Dict[str, Any],
+                            final_status: str,
+                            error_message: Optional[str],
+                            summary: str,
+                            error_strategy_name: str,
+                            formatted_results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Create the execution log.
+
+        Args:
+            workflow_name: Name of the workflow
+            time_metrics: Time-related metrics
+            final_status: Final status of the workflow
+            error_message: Optional error message
+            summary: Summary of the workflow execution
+            error_strategy_name: Name of the error handling strategy
+            formatted_results: Formatted action results
+
+        Returns:
+            Dict[str, Any]: Structured execution log
+        """
+        return self._log_builder.create_log_structure(
             workflow_name,
             time_metrics,
             final_status,
@@ -94,11 +159,18 @@ class ResultProcessor:
             formatted_results
         )
 
-        # Log the workflow completion status
+    def _log_workflow_completion(self,
+                                workflow_name: str,
+                                final_status: str,
+                                error_message: Optional[str]) -> None:
+        """
+        Log the workflow completion status.
+
+        Args:
+            workflow_name: Name of the workflow
+            final_status: Final status of the workflow
+            error_message: Optional error message
+        """
         self._completion_logger.log_workflow_completion(
             workflow_name, final_status, error_message
         )
-
-        return execution_log
-
-

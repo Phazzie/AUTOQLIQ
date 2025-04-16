@@ -36,18 +36,25 @@ class ParameterSubstitutor:
         Raises:
             ActionError: If parameter substitution fails
         """
-        # Serialize actions to dictionaries
-        action_dicts = [action.to_dict() for action in actions]
-        
-        # Apply parameter substitutions to serialized actions
-        for action_dict in action_dicts:
-            self._substitute_parameters_in_dict(action_dict, parameters)
-        
-        # Deserialize back to actions
         try:
-            return [self.action_factory.create_action(action_dict) for action_dict in action_dicts]
+            action_dicts = self._serialize_actions(actions)
+            self._substitute_parameters_in_dicts(action_dicts, parameters)
+            return self._deserialize_actions(action_dicts)
         except Exception as e:
             raise ActionError(f"Failed to apply template parameters: {e}", cause=e) from e
+
+    def _serialize_actions(self, actions: List[IAction]) -> List[Dict[str, Any]]:
+        """Serialize actions to dictionaries."""
+        return [action.to_dict() for action in actions]
+
+    def _substitute_parameters_in_dicts(self, action_dicts: List[Dict[str, Any]], parameters: Dict[str, Any]) -> None:
+        """Apply parameter substitutions to serialized actions."""
+        for action_dict in action_dicts:
+            self._substitute_parameters_in_dict(action_dict, parameters)
+
+    def _deserialize_actions(self, action_dicts: List[Dict[str, Any]]) -> List[IAction]:
+        """Deserialize dictionaries back to actions."""
+        return [self.action_factory.create_action(action_dict) for action_dict in action_dicts]
     
     def _substitute_parameters_in_dict(self, data: Dict[str, Any], parameters: Dict[str, Any]) -> None:
         """
