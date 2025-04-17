@@ -50,16 +50,7 @@ class SeleniumWebDriver(IWebDriver):
             service_instance = self._create_service(webdriver_path)
 
             logger.info(f"Attempting to create Selenium WebDriver instance...")
-            driver_map = { BrowserType.CHROME: webdriver.Chrome, BrowserType.FIREFOX: webdriver.Firefox,
-                           BrowserType.EDGE: webdriver.Edge, BrowserType.SAFARI: webdriver.Safari }
-            driver_class = driver_map.get(browser_type)
-            if driver_class is None: raise ConfigError(f"Unsupported browser: {browser_type}")
-
-            if browser_type == BrowserType.SAFARI:
-                 if service_instance: logger.warning("webdriver_path ignored for Safari.")
-                 self.driver = driver_class(options=options_instance)
-            else:
-                 self.driver = driver_class(service=service_instance, options=options_instance)
+            self.driver = self._create_driver_instance(browser_type, options_instance, service_instance)
 
             logger.info(f"Successfully created Selenium {browser_type.value} WebDriver instance.")
             if self.implicit_wait_seconds > 0:
@@ -105,6 +96,19 @@ class SeleniumWebDriver(IWebDriver):
          elif webdriver_path: logger.warning(f"webdriver_path '{webdriver_path}' ignored for {self.browser_type.value}.")
          else: logger.debug(f"Using Selenium Manager or system PATH for {self.browser_type.value}.")
          return None
+
+    def _create_driver_instance(self, browser_type: BrowserType, options_instance: Any, service_instance: Optional[Any]) -> RemoteWebDriver:
+        """Creates the Selenium WebDriver instance based on browser type."""
+        driver_map = { BrowserType.CHROME: webdriver.Chrome, BrowserType.FIREFOX: webdriver.Firefox,
+                       BrowserType.EDGE: webdriver.Edge, BrowserType.SAFARI: webdriver.Safari }
+        driver_class = driver_map.get(browser_type)
+        if driver_class is None: raise ConfigError(f"Unsupported browser: {browser_type}")
+
+        if browser_type == BrowserType.SAFARI:
+             if service_instance: logger.warning("webdriver_path ignored for Safari.")
+             return driver_class(options=options_instance)
+        else:
+             return driver_class(service=service_instance, options=options_instance)
 
     def _ensure_driver(self) -> RemoteWebDriver:
         """Checks if the driver is initialized."""

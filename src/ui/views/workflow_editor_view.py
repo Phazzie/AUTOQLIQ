@@ -65,6 +65,21 @@ class WorkflowEditorView(BaseView, IWorkflowEditorView):
         self.main_frame.columnconfigure(1, weight=3, minsize=350) # Action list column
 
         # --- Workflow List Section ---
+        self._create_workflow_list_section()
+
+        # --- Workflow Buttons Section ---
+        self._create_workflow_buttons_section()
+
+        # --- Action List Section ---
+        self._create_action_list_section()
+
+        # --- Action Buttons Section ---
+        self._create_action_buttons_section()
+
+        self.logger.debug("Editor widgets created.")
+
+    def _create_workflow_list_section(self) -> None:
+        """Create the workflow list section."""
         wf_list_frame = UIFactory.create_label_frame(self.main_frame, text="Workflows")
         wf_list_frame.grid(row=0, column=0, sticky=tk.NSEW, padx=(0, 5), pady=(0, 5))
         wf_list_frame.rowconfigure(0, weight=1)
@@ -75,7 +90,8 @@ class WorkflowEditorView(BaseView, IWorkflowEditorView):
         wf_scrolled_list["frame"].grid(row=0, column=0, sticky=tk.NSEW)
         self.workflow_list_widget.bind("<<ListboxSelect>>", self._on_workflow_selected)
 
-        # --- Workflow Buttons Section ---
+    def _create_workflow_buttons_section(self) -> None:
+        """Create the workflow buttons section."""
         wf_button_frame = UIFactory.create_frame(self.main_frame, padding="5 0 0 0")
         wf_button_frame.grid(row=1, column=0, sticky=tk.EW, padx=(0, 5))
 
@@ -88,7 +104,8 @@ class WorkflowEditorView(BaseView, IWorkflowEditorView):
         self.delete_button = UIFactory.create_button(wf_button_frame, text="Delete", command=self._on_delete_workflow, state=tk.DISABLED)
         self.delete_button.pack(side=tk.LEFT, padx=2)
 
-        # --- Action List Section ---
+    def _create_action_list_section(self) -> None:
+        """Create the action list section."""
         action_list_frame = UIFactory.create_label_frame(self.main_frame, text="Actions")
         action_list_frame.grid(row=0, column=1, sticky=tk.NSEW, pady=(0, 5))
         action_list_frame.rowconfigure(0, weight=1)
@@ -100,7 +117,8 @@ class WorkflowEditorView(BaseView, IWorkflowEditorView):
         self.action_list_widget.bind("<<ListboxSelect>>", self._on_action_selected)
         self.action_list_widget.bind("<Double-1>", self._on_edit_action)
 
-        # --- Action Buttons Section ---
+    def _create_action_buttons_section(self) -> None:
+        """Create the action buttons section."""
         action_button_frame = UIFactory.create_frame(self.main_frame, padding="5 0 0 0")
         action_button_frame.grid(row=1, column=1, sticky=tk.EW)
 
@@ -112,8 +130,6 @@ class WorkflowEditorView(BaseView, IWorkflowEditorView):
 
         self.delete_action_button = UIFactory.create_button(action_button_frame, text="Delete Action", command=self._on_delete_action, state=tk.DISABLED)
         self.delete_action_button.pack(side=tk.LEFT, padx=2)
-
-        self.logger.debug("Editor widgets created.")
 
     # --- IWorkflowEditorView Implementation ---
 

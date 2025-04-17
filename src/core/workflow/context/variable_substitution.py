@@ -64,14 +64,7 @@ class VariableSubstitutor(IVariableResolver):
         result = {}
 
         for key, value in data.items():
-            if isinstance(value, str):
-                result[key] = self.substitute_variables(value, context)
-            elif isinstance(value, dict):
-                result[key] = self.substitute_variables_in_dict(value, context)
-            elif isinstance(value, list):
-                result[key] = self.substitute_variables_in_list(value, context)
-            else:
-                result[key] = value
+            result[key] = self._substitute_value(value, context)
 
         return result
 
@@ -90,13 +83,26 @@ class VariableSubstitutor(IVariableResolver):
         result = []
 
         for item in data:
-            if isinstance(item, str):
-                result.append(self.substitute_variables(item, context))
-            elif isinstance(item, dict):
-                result.append(self.substitute_variables_in_dict(item, context))
-            elif isinstance(item, list):
-                result.append(self.substitute_variables_in_list(item, context))
-            else:
-                result.append(item)
+            result.append(self._substitute_value(item, context))
 
         return result
+
+    def _substitute_value(self, value: Any, context: Dict[str, Any]) -> Any:
+        """
+        Substitute variables in a value based on its type.
+
+        Args:
+            value: The value to substitute variables in
+            context: The execution context
+
+        Returns:
+            Any: The value with variables substituted
+        """
+        if isinstance(value, str):
+            return self.substitute_variables(value, context)
+        elif isinstance(value, dict):
+            return self.substitute_variables_in_dict(value, context)
+        elif isinstance(value, list):
+            return self.substitute_variables_in_list(value, context)
+        else:
+            return value

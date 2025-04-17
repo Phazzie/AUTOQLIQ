@@ -4,10 +4,10 @@ import logging
 import threading
 import time
 import tkinter as tk # Only needed for type hints potentially, avoid direct use
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 
 # Core dependencies
-from src.core.exceptions import WorkflowError, CredentialError, WebDriverError, AutoQliqError, ValidationError, ActionError
+from src.core.exceptions import WorkflowError, CredentialError, WebDriverError, AutoQliqError, ValidationError, ActionError, ConfigError
 from src.core.interfaces.service import IWorkflowService, ICredentialService, IWebDriverService # Use Service Interfaces
 from src.infrastructure.webdrivers.base import BrowserType # Use BrowserType enum
 # Configuration

@@ -40,9 +40,21 @@ class TemplateLoader:
             RepositoryError: If the template cannot be loaded
         """
         try:
-            return self.workflow_repo.load(template_name)
+            return self._load_template_from_repo(template_name)
         except Exception as e:
             raise RepositoryError(
                 f"Failed to load template '{template_name}': {e}",
                 cause=e
             ) from e
+
+    def _load_template_from_repo(self, template_name: str) -> List[IAction]:
+        """
+        Helper method to load a template from the repository.
+        
+        Args:
+            template_name: Name of the template to load
+            
+        Returns:
+            List[IAction]: The actions in the template
+        """
+        return self.workflow_repo.load(template_name)

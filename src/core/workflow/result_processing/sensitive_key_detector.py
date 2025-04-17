@@ -39,3 +39,15 @@ class SensitiveKeyDetector:
             bool: True if the key might contain sensitive information
         """
         return any(sensitive_word in key.lower() for sensitive_word in self.sensitive_words)
+    
+    def detect_sensitive_keys(self, keys: List[str]) -> List[str]:
+        """
+        Detect sensitive keys from a list of keys.
+        
+        Args:
+            keys: List of keys to check
+            
+        Returns:
+            List[str]: List of sensitive keys
+        """
+        return [key for key in keys if self.is_sensitive_key(key)]
