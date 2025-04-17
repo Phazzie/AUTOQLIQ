@@ -12,6 +12,7 @@ from src.core.exceptions import ActionError, WorkflowError
 from src.core.actions.conditional_action import ConditionalAction
 from src.core.workflow.control_flow.base import ControlFlowHandlerBase
 from src.core.workflow.control_flow.interfaces import IConditionalActionHandler
+from src.core.workflow.control_flow.utils import evaluate_action_results
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class ConditionalHandler(ControlFlowHandlerBase, IConditionalActionHandler):
             raise WorkflowError(f"ConditionalHandler received non-ConditionalAction: {type(action).__name__}")
 
         try:
-            condition_met = action._evaluate_condition(self.driver, context)
+            condition_met = self._evaluate_condition(action, context)
             logger.info(f"{log_prefix}Condition '{action.condition_type}' evaluated to {condition_met}")
 
             branch_to_run = action.true_branch if condition_met else action.false_branch
@@ -85,16 +86,7 @@ class ConditionalHandler(ControlFlowHandlerBase, IConditionalActionHandler):
             branch_results = self.execute_actions(branch_to_run, context, workflow_name, branch_prefix)
 
             # Return success if all branch actions succeeded
-            all_success = all(result.is_success() for result in branch_results)
-            if all_success:
-                return ActionResult.success(
-                    f"Conditional executed {branch_name} branch successfully ({len(branch_results)} actions)"
-                )
-            else:
-                # If we got here with failures, we must be using CONTINUE_ON_ERROR
-                return ActionResult.failure(
-                    f"Conditional {branch_name} branch had failures ({len(branch_results)} actions)"
-                )
+            return self._determine_action_result(branch_results, branch_name)
 
         except ActionError as e:
             # Let the runner's error handling strategy deal with this
@@ -107,3 +99,35 @@ class ConditionalHandler(ControlFlowHandlerBase, IConditionalActionHandler):
                 action_type=action.action_type,
                 cause=e
             ) from e
+
+    def _evaluate_condition(self, action: ConditionalAction, context: Dict[str, Any]) -> bool:
+        """
+        Evaluate the condition of a ConditionalAction.
+
+        Args:
+            action: The ConditionalAction to evaluate
+            context: The execution context
+
+        Returns:
+            bool: The result of evaluating the condition
+        """
+        return action._evaluate_condition(self.driver, context)
+
+    def _determine_action_result(self, branch_results: List[ActionResult], branch_name: str) -> ActionResult:
+        """
+        Determine the ActionResult based on the branch results.
+
+        Args:
+            branch_results: List of ActionResult objects from the executed branch
+            branch_name: Name of the branch ('true' or 'false')
+
+        Returns:
+            ActionResult: The final ActionResult
+        """
+        # Use the common utility function to evaluate action results
+        return evaluate_action_results(
+            results=branch_results,
+            branch_name=f"Conditional {branch_name} branch",
+            success_message_template="Conditional executed {branch_name} successfully ({action_count} actions)",
+            failure_message_template="Conditional {branch_name} had failures ({action_count} actions)"
+        )

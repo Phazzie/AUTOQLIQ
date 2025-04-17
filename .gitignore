@@ -37,6 +37,7 @@ context_export_*/
 # Backup files
 *_backup/
 archive/
+*.bak
 
 # Test output
 .coverage

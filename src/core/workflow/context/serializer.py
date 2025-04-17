@@ -37,11 +37,10 @@ class ContextSerializer(IContextSerializer):
             ValueError: If the context cannot be serialized
         """
         try:
-            # Filter out non-serializable values
             serializable_context = self._make_serializable(context)
             return json.dumps(serializable_context)
         except Exception as e:
-            logger.error(f"Error serializing context: {e}")
+            self._log_serialization_error(e)
             raise ValueError(f"Error serializing context: {e}") from e
 
     def deserialize_context(self, serialized_context: str) -> Dict[str, Any]:
@@ -60,7 +59,7 @@ class ContextSerializer(IContextSerializer):
         try:
             return json.loads(serialized_context)
         except Exception as e:
-            logger.error(f"Error deserializing context: {e}")
+            self._log_deserialization_error(e)
             raise ValueError(f"Error deserializing context: {e}") from e
 
     def _make_serializable(self, obj: Any) -> Any:
@@ -80,5 +79,22 @@ class ContextSerializer(IContextSerializer):
         elif isinstance(obj, (str, int, float, bool, type(None))):
             return obj
         else:
-            # Convert other types to strings
             return str(obj)
+
+    def _log_serialization_error(self, error: Exception) -> None:
+        """
+        Log an error that occurred during serialization.
+
+        Args:
+            error: The exception that occurred
+        """
+        logger.error(f"Error serializing context: {error}")
+
+    def _log_deserialization_error(self, error: Exception) -> None:
+        """
+        Log an error that occurred during deserialization.
+
+        Args:
+            error: The exception that occurred
+        """
+        logger.error(f"Error deserializing context: {error}")
