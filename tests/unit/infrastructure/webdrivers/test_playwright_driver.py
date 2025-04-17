@@ -12,12 +12,16 @@ tests faster, more reliable, and independent of the environment.
 import unittest
 from unittest.mock import MagicMock, patch, PropertyMock
 
-# Define exception classes for testing
-class PlaywrightError(Exception):
-    pass
+# Import actual Playwright exceptions for testing
+try:
+    from playwright.sync_api import Error as PlaywrightError, TimeoutError as PlaywrightTimeoutError
+except ImportError:
+    # Fallback to mock exceptions if Playwright is not installed
+    class PlaywrightError(Exception):
+        pass
 
-class PlaywrightTimeoutError(PlaywrightError):
-    pass
+    class PlaywrightTimeoutError(PlaywrightError):
+        pass
 
 from src.core.exceptions import WebDriverError
 from src.infrastructure.webdrivers.base import BrowserType
