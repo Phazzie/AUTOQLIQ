@@ -116,15 +116,24 @@ class PlaywrightDriver(IWebDriver):
             self._screenshot_handler = PlaywrightScreenshotHandler(self)
 
         except PlaywrightError as e:
-            err_msg = f"Failed to launch Playwright {browser_type.value}: {e}"
+            # Provide detailed context about what specific Playwright operation failed
+            operation = "browser launch" if self.browser is None else "page creation"
+            err_msg = f"Failed to launch Playwright {browser_type.value} during {operation}: {e}"
             logger.error(err_msg, exc_info=True)
             self.quit()  # Attempt cleanup
-            raise WebDriverError(err_msg) from e
+            raise WebDriverError(f"Playwright initialization error: {err_msg}. Check if Playwright is properly installed and browser binaries are available.") from e
+        except ValueError as e:
+            # Handle specific browser type mapping errors
+            err_msg = f"Invalid browser configuration for Playwright: {e}"
+            logger.error(err_msg, exc_info=True)
+            self.quit()  # Attempt cleanup
+            raise WebDriverError(f"Browser configuration error: {err_msg}. Supported browsers are Chrome (chromium), Firefox, Edge (chromium), and Safari (webkit).") from e
         except Exception as e:
+            # Handle unexpected errors with detailed context
             err_msg = f"An unexpected error occurred during Playwright initialization: {e}"
             logger.error(err_msg, exc_info=True)
             self.quit()  # Attempt cleanup
-            raise WebDriverError(err_msg) from e
+            raise WebDriverError(f"Unexpected Playwright error: {err_msg}. Please check system configuration and Playwright installation.") from e
 
     def _get_browser_launcher(self) -> Any:
         """Get the appropriate Playwright browser launcher based on BrowserType.
@@ -146,10 +155,16 @@ class PlaywrightDriver(IWebDriver):
             return self._playwright.firefox
         elif self.browser_type == BrowserType.SAFARI:  # Playwright uses 'webkit' for Safari
             return self._playwright.webkit
-        # Note: Playwright doesn't map directly to 'EDGE' like Selenium.
-        # Chromium is typically used for Edge since modern Edge is Chromium-based
+        # Handle Edge browser specifically
+        # Modern Edge is Chromium-based, so we use Playwright's chromium launcher
+        # but with specific Edge configurations if provided
         elif self.browser_type == BrowserType.EDGE:
-            logger.warning("Mapping Edge to Playwright's Chromium since modern Edge is Chromium-based.")
+            logger.info("Using Playwright's Chromium for Edge browser (modern Edge is Chromium-based)")
+            # Check if specific Edge executable path is provided in launch options
+            if self.launch_options and 'executable_path' in self.launch_options:
+                logger.info(f"Using custom Edge executable path: {self.launch_options['executable_path']}")
+            else:
+                logger.info("Using default Chromium for Edge. For specific Edge version, provide 'executable_path' in launch_options")
             return self._playwright.chromium
         else:
             raise ValueError(f"Unsupported browser type for Playwright: {self.browser_type}")
@@ -191,8 +206,20 @@ class PlaywrightDriver(IWebDriver):
         try:
             page = self._ensure_page()
             page.goto(url)
+        except PlaywrightTimeoutError as e:
+            # Specific handling for timeout errors during navigation
+            raise WebDriverError(f"Timeout while navigating to {url}: {e}. Consider increasing the timeout or check if the page is accessible.") from e
         except PlaywrightError as e:
-            raise WebDriverError(f"Playwright failed to navigate to {url}: {e}") from e
+            # Handle other Playwright errors with context
+            error_context = ""
+            if "ERR_NAME_NOT_RESOLVED" in str(e):
+                error_context = " URL may be invalid or network connection is down."
+            elif "ERR_CONNECTION_REFUSED" in str(e):
+                error_context = " Server may be down or not accepting connections."
+            elif "ERR_ABORTED" in str(e):
+                error_context = " Navigation was aborted, possibly by a redirect or script."
+
+            raise WebDriverError(f"Playwright failed to navigate to {url}: {e}.{error_context}") from e
 
     def quit(self) -> None:
         """Close the browser and stop the Playwright instance.
