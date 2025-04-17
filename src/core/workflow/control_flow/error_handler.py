@@ -12,6 +12,7 @@ from src.core.exceptions import ActionError, WorkflowError
 from src.core.actions.error_handling_action import ErrorHandlingAction
 from src.core.workflow.control_flow.base import ControlFlowHandlerBase
 from src.core.workflow.control_flow.interfaces import IErrorHandlingActionHandler
+from src.core.workflow.control_flow.utils import evaluate_action_results, create_error_context
 
 logger = logging.getLogger(__name__)
 
@@ -92,13 +93,10 @@ class ErrorHandlingHandler(ControlFlowHandlerBase, IErrorHandlingActionHandler):
         Returns:
             Dict[str, Any]: The context for the catch block
         """
-        catch_context = context.copy()
-        catch_context.update({
-            'error': str(try_error),
-            'error_type': type(try_error).__name__,
-            'try_block_error_message': str(try_error),
-            'try_block_error_type': type(try_error).__name__
-        })
+        # Use the common utility function to create error context
+        # Add both general error info and try_block specific error info
+        catch_context = create_error_context(context, try_error)
+        catch_context.update(create_error_context(context, try_error, prefix="try_block_"))
         return catch_context
 
     def _evaluate_catch_results(self, catch_results: List[ActionResult], try_error: Exception, log_prefix: str) -> ActionResult:
@@ -113,18 +111,18 @@ class ErrorHandlingHandler(ControlFlowHandlerBase, IErrorHandlingActionHandler):
         Returns:
             ActionResult: The result of evaluating the catch block
         """
-        all_success = all(result.is_success() for result in catch_results)
-        if all_success:
-            logger.info(f"{log_prefix}'catch' block succeeded, error handled.")
-            return ActionResult.success(
-                f"Error handled by catch block: {str(try_error)}"
-            )
-        else:
-            # If we got here with failures in catch block, we must be using CONTINUE_ON_ERROR
-            logger.warning(f"{log_prefix}'catch' block had failures.")
-            return ActionResult.failure(
-                f"Catch block had failures after try error: {str(try_error)}"
-            )
+        # Use the common utility function to evaluate action results
+        result = evaluate_action_results(
+            results=catch_results,
+            branch_name="'catch' block",
+            log_prefix=log_prefix,
+            success_message_template="Error handled by catch block: {error}",
+            failure_message_template="Catch block had failures after try error: {error}"
+        )
+
+        # Replace {error} placeholder with actual error message
+        result.message = result.message.format(error=str(try_error))
+        return result
 
     def handle_error(
         self,
@@ -188,14 +186,8 @@ class ErrorHandlingHandler(ControlFlowHandlerBase, IErrorHandlingActionHandler):
         Returns:
             Dict[str, Any]: The context for error handling actions
         """
-        error_context = context.copy()
-        error_context.update({
-            'error': str(error),
-            'error_type': type(error).__name__,
-            'error_message': str(error),
-            'error_type_name': type(error).__name__
-        })
-        return error_context
+        # Use the common utility function to create error context
+        return create_error_context(context, error)
 
     def _evaluate_error_results(self, error_results: List[ActionResult], error: Exception, log_prefix: str) -> ActionResult:
         """
@@ -209,15 +201,15 @@ class ErrorHandlingHandler(ControlFlowHandlerBase, IErrorHandlingActionHandler):
         Returns:
             ActionResult: The result of evaluating the error handling actions
         """
-        all_success = all(result.is_success() for result in error_results)
-        if all_success:
-            logger.info(f"{log_prefix}Error handling succeeded.")
-            return ActionResult.success(
-                f"Error handled successfully: {str(error)}"
-            )
-        else:
-            # If we got here with failures, we must be using CONTINUE_ON_ERROR
-            logger.warning(f"{log_prefix}Error handling had failures.")
-            return ActionResult.failure(
-                f"Error handling had failures: {str(error)}"
-            )
+        # Use the common utility function to evaluate action results
+        result = evaluate_action_results(
+            results=error_results,
+            branch_name="Error handling",
+            log_prefix=log_prefix,
+            success_message_template="Error handled successfully: {error}",
+            failure_message_template="Error handling had failures: {error}"
+        )
+
+        # Replace {error} placeholder with actual error message
+        result.message = result.message.format(error=str(error))
+        return result

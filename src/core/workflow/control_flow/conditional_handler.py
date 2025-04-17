@@ -12,6 +12,7 @@ from src.core.exceptions import ActionError, WorkflowError
 from src.core.actions.conditional_action import ConditionalAction
 from src.core.workflow.control_flow.base import ControlFlowHandlerBase
 from src.core.workflow.control_flow.interfaces import IConditionalActionHandler
+from src.core.workflow.control_flow.utils import evaluate_action_results
 
 logger = logging.getLogger(__name__)
 
@@ -123,13 +124,10 @@ class ConditionalHandler(ControlFlowHandlerBase, IConditionalActionHandler):
         Returns:
             ActionResult: The final ActionResult
         """
-        all_success = all(result.is_success() for result in branch_results)
-        if all_success:
-            return ActionResult.success(
-                f"Conditional executed {branch_name} branch successfully ({len(branch_results)} actions)"
-            )
-        else:
-            # If we got here with failures, we must be using CONTINUE_ON_ERROR
-            return ActionResult.failure(
-                f"Conditional {branch_name} branch had failures ({len(branch_results)} actions)"
-            )
+        # Use the common utility function to evaluate action results
+        return evaluate_action_results(
+            results=branch_results,
+            branch_name=f"Conditional {branch_name} branch",
+            success_message_template="Conditional executed {branch_name} successfully ({action_count} actions)",
+            failure_message_template="Conditional {branch_name} had failures ({action_count} actions)"
+        )
