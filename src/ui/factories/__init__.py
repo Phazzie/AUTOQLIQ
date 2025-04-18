@@ -6,9 +6,11 @@ This package provides factories for creating UI components.
 from src.ui.factories.presenter_factory import PresenterFactory
 from src.ui.factories.view_factory import ViewFactory
 from src.ui.factories.application_factory import ApplicationFactory
+from src.ui.factories.enhanced_view_factory import EnhancedViewFactory
 
 __all__ = [
     "PresenterFactory",
     "ViewFactory",
     "ApplicationFactory",
+    "EnhancedViewFactory",
 ]
