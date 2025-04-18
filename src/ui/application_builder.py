@@ -7,6 +7,7 @@ import logging
 from typing import Optional, Dict, Any
 
 from src.ui.application import UIApplication
+from src.ui.common.error_handler import ErrorHandler
 
 
 class UIApplicationBuilder:
@@ -21,6 +22,7 @@ class UIApplicationBuilder:
         _logger: The logger for recording application operations and errors
         _repository_type: The type of repositories to create
         _repository_options: Options for the repositories
+        _services: A dictionary to hold registered services
     """
     
     def __init__(self):
@@ -30,6 +32,7 @@ class UIApplicationBuilder:
         self._logger = None
         self._repository_type = "file_system"
         self._repository_options = None
+        self._services = {}
     
     def with_title(self, title: str) -> 'UIApplicationBuilder':
         """Set the title of the application window.
@@ -81,6 +84,19 @@ class UIApplicationBuilder:
         self._repository_options = options
         return self
     
+    def register_service(self, service_name: str, service_instance: Any) -> 'UIApplicationBuilder':
+        """Register a service to be used by the application.
+        
+        Args:
+            service_name: The name of the service
+            service_instance: The instance of the service
+            
+        Returns:
+            This builder
+        """
+        self._services[service_name] = service_instance
+        return self
+    
     def build(self) -> UIApplication:
         """Build the application.
         
@@ -99,5 +115,9 @@ class UIApplicationBuilder:
             repository_type=self._repository_type,
             repository_options=self._repository_options
         )
+        
+        # Register services
+        for service_name, service_instance in self._services.items():
+            app.service_provider.register(service_name, service_instance)
         
         return app

@@ -15,6 +15,7 @@ from src.ui.common.component_factory_registry import ComponentFactoryRegistry
 from src.ui.factories.application_factory import ApplicationFactory
 from src.ui.factories.presenter_factory import PresenterFactory
 from src.ui.factories.view_factory import ViewFactory
+from src.ui.application_builder import UIApplicationBuilder
 
 
 class UIApplication:
@@ -134,3 +135,19 @@ class UIApplication:
             self.logger.exception(f"Error running application: {str(e)}")
         finally:
             self.logger.info("Exiting application")
+
+
+def create_application() -> UIApplication:
+    """Create and configure the main UI application using UIApplicationBuilder.
+    
+    Returns:
+        The configured UIApplication instance
+    """
+    logger = logging.getLogger(__name__)
+    app = (UIApplicationBuilder()
+           .with_title("AutoQliq")
+           .with_geometry("800x600")
+           .with_logger(logger)
+           .with_repositories("file_system")
+           .build())
+    return app

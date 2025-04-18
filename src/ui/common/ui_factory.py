@@ -4,6 +4,7 @@ from tkinter import ttk
 from typing import Callable, List, Dict, Any, Optional, Union
 
 from src.core.exceptions import UIError
+from src.ui.common.service_provider import ServiceProvider
 
 
 class UIFactory:
@@ -12,6 +13,14 @@ class UIFactory:
     This class provides methods for creating common UI components with consistent
     styling and behavior. It primarily uses ttk widgets for a modern look.
     """
+
+    def __init__(self, service_provider: Optional[ServiceProvider] = None):
+        """Initialize a new UIFactory.
+
+        Args:
+            service_provider: The service provider for dependency injection.
+        """
+        self.service_provider = service_provider or ServiceProvider()
 
     @staticmethod
     def create_frame(parent: tk.Widget, padding: Union[str, int] = "10", relief: str = tk.FLAT, **kwargs) -> ttk.Frame:
