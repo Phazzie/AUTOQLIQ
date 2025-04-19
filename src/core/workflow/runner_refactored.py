@@ -26,7 +26,7 @@ from src.core.workflow.runner_execution import execute_workflow
 from src.core.workflow.action_execution import execute_actions
 
 # For backward compatibility
-from src.core.workflow.runner import ErrorHandlingStrategy
+from src.core.workflow.error_handling.strategy_enum import ErrorHandlingStrategy
 
 logger = logging.getLogger(__name__)
 

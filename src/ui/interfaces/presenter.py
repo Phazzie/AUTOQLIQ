@@ -43,7 +43,7 @@ class IWorkflowEditorPresenter(IPresenter):
         pass
 
     @abc.abstractmethod
-    def save_workflow(self, name: str, actions: List[Dict[str, Any]]) -> None:
+    def save_workflow(self, name: Optional[str] = None, actions_data: Optional[List[Dict[str, Any]]] = None) -> None:
         """Save the currently edited workflow actions under the given name."""
         pass
 
@@ -63,6 +63,11 @@ class IWorkflowEditorPresenter(IPresenter):
         pass
 
     @abc.abstractmethod
+    def insert_action(self, position: int, action_data: Dict[str, Any]) -> None:
+        """Insert a new action at the specified position in the current workflow."""
+        pass
+
+    @abc.abstractmethod
     def update_action(self, index: int, action_data: Dict[str, Any]) -> None:
         """Update the action at the specified index with new data."""
         pass
@@ -73,8 +78,18 @@ class IWorkflowEditorPresenter(IPresenter):
         pass
 
     @abc.abstractmethod
+    def move_action(self, from_index: int, to_index: int) -> None:
+        """Move an action from one position to another in the current workflow."""
+        pass
+
+    @abc.abstractmethod
     def get_action_data(self, index: int) -> Optional[Dict[str, Any]]:
          """Get the data dictionary for the action at the specified index."""
+         pass
+
+    @abc.abstractmethod
+    def get_all_actions_data(self) -> List[Dict[str, Any]]:
+         """Get data dictionaries for all actions in the current workflow."""
          pass
 
 

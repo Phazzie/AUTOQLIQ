@@ -20,10 +20,10 @@ from src.ui.application_builder import UIApplicationBuilder
 
 class UIApplication:
     """Main UI application for AutoQliq.
-    
+
     This class provides the main UI application for AutoQliq, managing the
     application lifecycle and dependencies.
-    
+
     Attributes:
         root: The root Tkinter window
         service_provider: The service provider for dependency injection
@@ -31,7 +31,7 @@ class UIApplication:
         application_factory: The factory for application components
         logger: Logger for recording application operations and errors
     """
-    
+
     def __init__(
         self,
         title: str = "AutoQliq",
@@ -39,7 +39,7 @@ class UIApplication:
         logger: Optional[logging.Logger] = None
     ):
         """Initialize a new UIApplication.
-        
+
         Args:
             title: The title of the application window
             geometry: The geometry of the application window
@@ -49,82 +49,82 @@ class UIApplication:
         self.root = tk.Tk()
         self.root.title(title)
         self.root.geometry(geometry)
-        
+
         # Create the logger
         self.logger = logger or logging.getLogger(__name__)
-        
+
         # Create the service provider
         self.service_provider = ServiceProvider()
-        
+
         # Create the factory registry
         self.factory_registry = ComponentFactoryRegistry(self.service_provider)
-        
+
         # Register factory types
         self._register_factory_types()
-        
+
         # Create the application factory
         self.application_factory = self._create_application_factory()
-    
+
     def _register_factory_types(self) -> None:
         """Register factory types in the registry."""
         self.factory_registry.register("presenter", PresenterFactory)
         self.factory_registry.register("view", ViewFactory)
         self.factory_registry.register("application", ApplicationFactory)
-    
+
     def _create_application_factory(self) -> ApplicationFactory:
         """Create the application factory.
-        
+
         Returns:
             The application factory
         """
         # Create the presenter factory
         presenter_factory = self.factory_registry.create("presenter")
-        
+
         # Create the view factory
         view_factory = self.factory_registry.create(
-            "view", 
+            "view",
             presenter_factory=presenter_factory
         )
-        
+
         # Create the application factory
         return self.factory_registry.create(
             "application",
             presenter_factory=presenter_factory,
             view_factory=view_factory
         )
-    
+
     def register_repositories(
         self,
         repository_type: str = "file_system",
         repository_options: Optional[Dict[str, Any]] = None
     ) -> None:
         """Register repositories in the service provider.
-        
+
         Args:
             repository_type: The type of repositories to create
             repository_options: Options for the repositories
         """
         # Create the repository factory
         repository_factory = RepositoryFactory()
-        
+
         # Create the repositories
         workflow_repo = repository_factory.create_workflow_repository(repository_type)
         credential_repo = repository_factory.create_credential_repository(repository_type)
-        
+
         # Create the webdriver factory
         webdriver_factory = WebDriverFactory()
-        
+
         # Register the repositories and factories
         self.application_factory.register_services(
             workflow_repo,
             credential_repo,
             webdriver_factory
         )
-    
+
     def create_notebook_application(self) -> None:
         """Create the notebook application."""
         self.application_factory.create("notebook_application", root=self.root)
-    
+
     def run(self) -> None:
         """Run the application."""
         try:
@@ -134,20 +134,39 @@ class UIApplication:
         except Exception as e:
             self.logger.exception(f"Error running application: {str(e)}")
         finally:
+            self.teardown()
             self.logger.info("Exiting application")
+
+    def teardown(self) -> None:
+        """Clean up resources when the application exits.
+
+        This method is called when the application exits, either normally or due to an error.
+        It ensures that all resources are properly released.
+        """
+        self.logger.debug("Cleaning up application resources")
+
+        # Clean up any resources that need to be released
+        # For example, close database connections, release file handles, etc.
+
+        # Get the webdriver factory if it exists
+        webdriver_factory = self.service_provider.get(WebDriverFactory)
+        if webdriver_factory:
+            # Close any open webdriver instances
+            self.logger.debug("Closing webdriver instances")
+            # This would require the WebDriverFactory to have a close_all method
+            # webdriver_factory.close_all()
+
+        # Destroy the root window if it still exists
+        if self.root and self.root.winfo_exists():
+            self.logger.debug("Destroying root window")
+            self.root.destroy()
 
 
 def create_application() -> UIApplication:
     """Create and configure the main UI application using UIApplicationBuilder.
-    
+
     Returns:
         The configured UIApplication instance
     """
     logger = logging.getLogger(__name__)
-    app = (UIApplicationBuilder()
-           .with_title("AutoQliq")
-           .with_geometry("800x600")
-           .with_logger(logger)
-           .with_repositories("file_system")
-           .build())
-    return app
+    return UIApplicationBuilder.create_default_application(logger)

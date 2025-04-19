@@ -38,7 +38,7 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
         # Widgets specific to this view
         self.workflow_list_widget: Optional[tk.Listbox] = None
         self.action_list: Optional[WorkflowActionList] = None
-        
+
         # Buttons
         self.new_button: Optional[ttk.Button] = None
         self.save_button: Optional[ttk.Button] = None
@@ -73,20 +73,20 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
         wf_scrolled_list = UIFactory.create_scrolled_listbox(wf_list_frame, height=15)
         self.workflow_list_widget = wf_scrolled_list["listbox"]
         wf_scrolled_list["frame"].grid(row=0, column=0, sticky=tk.NSEW)
-        
+
         # Bind selection event
         self.workflow_list_widget.bind('<<ListboxSelect>>', self._on_workflow_selected)
-        
+
         # Workflow buttons
         wf_button_frame = UIFactory.create_frame(wf_list_frame, padding="5 5 5 0")
         wf_button_frame.grid(row=1, column=0, sticky=tk.EW)
-        
+
         self.new_button = UIFactory.create_button(wf_button_frame, text="New", command=self._on_new_workflow)
         self.new_button.pack(side=tk.LEFT, padx=2)
-        
+
         self.save_button = UIFactory.create_button(wf_button_frame, text="Save", command=self._on_save_workflow, state=tk.DISABLED)
         self.save_button.pack(side=tk.LEFT, padx=2)
-        
+
         self.delete_button = UIFactory.create_button(wf_button_frame, text="Delete", command=self._on_delete_workflow, state=tk.DISABLED)
         self.delete_button.pack(side=tk.LEFT, padx=2)
 
@@ -95,7 +95,7 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
         action_list_frame.grid(row=0, column=1, sticky=tk.NSEW, pady=(0, 5))
         action_list_frame.rowconfigure(0, weight=1)
         action_list_frame.columnconfigure(0, weight=1)
-        
+
         # Create the visual action list
         self.action_list = WorkflowActionList(
             action_list_frame,
@@ -105,15 +105,15 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
             on_move=self._on_move_action
         )
         self.action_list.pack(fill=tk.BOTH, expand=True)
-        
+
         # Status bar at the bottom
         status_frame = UIFactory.create_frame(self.main_frame, padding="0 5 0 0")
         status_frame.grid(row=1, column=0, columnspan=2, sticky=tk.EW)
-        
+
         self.status_var = tk.StringVar(value="Ready")
         status_label = UIFactory.create_label(status_frame, textvariable=self.status_var, anchor=tk.W)
         status_label.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        
+
         self.logger.debug("Enhanced editor widgets created.")
 
     # --- IWorkflowEditorView Implementation ---
@@ -122,37 +122,37 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
         """Display the list of available workflows."""
         if not self.workflow_list_widget:
             return
-        
+
         self.logger.debug(f"Setting workflow list with {len(workflow_names)} items.")
-        
+
         # Remember the currently selected workflow
         current_selection = self.get_selected_workflow_name()
-        
+
         # Update the list
         self.workflow_list_widget.delete(0, tk.END)
         for name in workflow_names:
             self.workflow_list_widget.insert(tk.END, name)
-        
+
         # Restore selection if possible
         if current_selection and current_selection in workflow_names:
             index = workflow_names.index(current_selection)
             self.workflow_list_widget.selection_set(index)
             self.workflow_list_widget.see(index)
-        
+
         # Update button states
         self._update_workflow_button_states()
 
     def set_action_list(self, actions_display: List[str]) -> None:
         """
         Display the actions for the current workflow.
-        
+
         This method is called by the presenter with string representations of actions.
         We need to convert these to action data dictionaries for our visual list.
         """
         # This is a compatibility method for the existing presenter
         # In a real implementation, we would update the presenter to pass action data directly
         self.logger.debug(f"Setting action list with {len(actions_display)} items.")
-        
+
         # Convert string representations to dummy action data
         # This is a temporary solution until the presenter is updated
         action_data_list = []
@@ -160,25 +160,36 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
             # Parse the display text to extract action type and parameters
             action_data = self._parse_action_display(display_text)
             action_data_list.append(action_data)
-        
+
         # Update the visual action list
         self.action_list.update_actions(action_data_list)
+
+    def set_action_data_list(self, actions_data: List[Dict[str, Any]]) -> None:
+        """
+        Display the actions for the current workflow using action data dictionaries.
+
+        This method is called by the enhanced presenter with action data dictionaries.
+        """
+        self.logger.debug(f"Setting action data list with {len(actions_data)} items.")
+
+        # Update the visual action list with the action data
+        self.action_list.update_actions(actions_data)
 
     def _parse_action_display(self, display_text: str) -> Dict[str, Any]:
         """
         Parse a display text string into an action data dictionary.
-        
+
         This is a temporary solution until the presenter is updated to pass action data directly.
-        
+
         Args:
             display_text: The display text string
-            
+
         Returns:
             An action data dictionary
         """
         # Default action data
         action_data = {"type": "Unknown", "name": "Unknown Action"}
-        
+
         # Try to parse the display text
         try:
             # Common format: "ActionType: parameter"
@@ -186,7 +197,7 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
                 action_type, params = display_text.split(": ", 1)
                 action_data["type"] = action_type
                 action_data["name"] = action_type
-                
+
                 # Add parameters based on action type
                 if action_type == "Navigate":
                     action_data["url"] = params
@@ -209,7 +220,7 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
                 action_data["name"] = display_text
         except Exception as e:
             self.logger.warning(f"Error parsing action display text: {e}")
-        
+
         return action_data
 
     def set_status(self, message: str) -> None:
@@ -222,18 +233,18 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
         """Get the name of the currently selected workflow."""
         if not self.workflow_list_widget:
             return None
-        
+
         selection = self.workflow_list_widget.curselection()
         if not selection:
             return None
-        
+
         return self.workflow_list_widget.get(selection[0])
 
     def get_selected_action_index(self) -> Optional[int]:
         """Get the index of the currently selected action."""
         if not self.action_list:
             return None
-        
+
         return self.action_list.get_selected_index()
 
     def prompt_for_workflow_name(self, title: str, prompt: str) -> Optional[str]:
@@ -266,6 +277,24 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
             self.display_error("Dialog Error", f"Could not open action editor: {e}")
             return None
 
+    def show_action_selection_dialog(self) -> Optional[str]:
+        """Show the action selection dialog. Returns the selected action type or None if cancelled."""
+        self.logger.debug("Showing ActionSelectionDialog")
+        try:
+            # Import here to avoid circular imports
+            from src.ui.dialogs.action_selection_dialog import ActionSelectionDialog
+
+            # Create and show the dialog
+            dialog = ActionSelectionDialog(self.main_frame)
+            action_type = dialog.show()  # show() blocks and returns action type or None
+
+            self.logger.debug(f"ActionSelectionDialog returned: {action_type}")
+            return action_type
+        except Exception as e:
+            self.logger.error(f"Error showing ActionSelectionDialog: {e}", exc_info=True)
+            self.display_error("Dialog Error", f"Could not open action selection dialog: {e}")
+            return None
+
     # --- Internal Event Handlers ---
 
     def _on_workflow_selected(self, event: Optional[tk.Event] = None) -> None:
@@ -274,7 +303,13 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
         self.logger.debug(f"Workflow selected: {selected_name}")
         self._update_workflow_button_states()
         if selected_name:
-            self.presenter.load_workflow(selected_name)
+            try:
+                self.presenter.load_workflow(selected_name)
+                # Update the status bar
+                self.set_status(f"Workflow '{selected_name}' loaded.")
+            except Exception as e:
+                self.logger.error(f"Error loading workflow: {e}", exc_info=True)
+                self.display_error("Load Error", f"Could not load workflow '{selected_name}': {e}")
         else:
             # Clear action list if no workflow selected
             self.set_action_list([])
@@ -312,7 +347,7 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
     def _on_insert_action(self, position: int) -> None:
         """
         Handle inserting an action at the specified position.
-        
+
         Args:
             position: The position to insert the action at
         """
@@ -320,27 +355,35 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
         if self.get_selected_workflow_name() is None:
             self.display_message("Add Action", "Please select or create a workflow first.")
             return
-        
-        # Show the action editor dialog
-        action_data = self.show_action_editor()
+
+        # First, show the action selection dialog to choose the action type
+        action_type = self.show_action_selection_dialog()
+        if not action_type:
+            self.logger.debug("Action selection cancelled by user.")
+            return
+
+        # Create initial action data with the selected type
+        initial_data = {"type": action_type}
+
+        # Show the action editor dialog with the initial data
+        action_data = self.show_action_editor(initial_data)
         if action_data:
-            # For now, we'll just add the action at the end
-            # In a real implementation, we would update the presenter to support inserting at a position
-            self.presenter.add_action(action_data)
-            self.logger.debug(f"Action added at end (position {position} requested).")
-            self.set_status(f"Action added. Note: Inserting at specific positions is not yet supported.")
+            # Use the presenter's insert_action method to insert at the specified position
+            self.presenter.insert_action(position, action_data)
+            self.logger.debug(f"Action inserted at position {position}.")
+            self.set_status(f"Action inserted at position {position+1}.")
         else:
             self.logger.debug("Add action cancelled by user.")
 
     def _on_edit_action(self, index: int) -> None:
         """
         Handle editing an action.
-        
+
         Args:
             index: The index of the action to edit
         """
         self.logger.debug(f"Edit action at index {index} requested.")
-        
+
         # Get current data from presenter's internal state
         current_action_data = self.presenter.get_action_data(index)
         if current_action_data:
@@ -358,12 +401,12 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
     def _on_delete_action(self, index: int) -> None:
         """
         Handle deleting an action.
-        
+
         Args:
             index: The index of the action to delete
         """
         self.logger.debug(f"Delete action at index {index} requested.")
-        
+
         # Confirm deletion
         if self.confirm_action("Confirm Delete", f"Are you sure you want to delete this action?"):
             # Delegate deletion to presenter
@@ -374,24 +417,29 @@ class WorkflowEditorViewEnhanced(BaseView, IWorkflowEditorView):
     def _on_move_action(self, from_index: int, to_index: int) -> None:
         """
         Handle moving an action from one position to another.
-        
+
         Args:
             from_index: The current index of the action
             to_index: The target index for the action
         """
         self.logger.debug(f"Move action from index {from_index} to {to_index} requested.")
-        
-        # For now, we'll just show a message
-        # In a real implementation, we would update the presenter to support moving actions
-        self.set_status(f"Moving actions is not yet supported.")
-        self.logger.debug(f"Action move not supported yet.")
+
+        # Use the presenter's move_action method to move the action
+        try:
+            self.presenter.move_action(from_index, to_index)
+            self.logger.debug(f"Action moved from index {from_index} to {to_index}.")
+        except Exception as e:
+            self.logger.error(f"Error moving action: {e}", exc_info=True)
+            self.display_error("Move Error", f"Could not move action: {e}")
+            self.set_status(f"Error moving action from position {from_index+1} to {to_index+1}.")
+
 
     def _update_workflow_button_states(self) -> None:
         """Update the enabled/disabled state of workflow buttons."""
         has_selection = self.get_selected_workflow_name() is not None
-        
+
         if self.save_button:
             self.save_button.configure(state=tk.NORMAL if has_selection else tk.DISABLED)
-        
+
         if self.delete_button:
             self.delete_button.configure(state=tk.NORMAL if has_selection else tk.DISABLED)

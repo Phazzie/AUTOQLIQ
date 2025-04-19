@@ -54,6 +54,11 @@ class IWorkflowEditorView(IView):
         pass
 
     @abc.abstractmethod
+    def set_action_data_list(self, actions_data: List[Dict[str, Any]]) -> None:
+        """Display the actions for the currently loaded workflow using action data dictionaries."""
+        pass
+
+    @abc.abstractmethod
     def get_selected_workflow_name(self) -> Optional[str]:
         """Get the name of the workflow currently selected in the list."""
         pass
@@ -66,6 +71,11 @@ class IWorkflowEditorView(IView):
     @abc.abstractmethod
     def show_action_editor(self, action_data: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
          """Open a dialog/form to edit or add an action. Returns new data or None if cancelled."""
+         pass
+
+    @abc.abstractmethod
+    def show_action_selection_dialog(self) -> Optional[str]:
+         """Show the action selection dialog. Returns the selected action type or None if cancelled."""
          pass
 
     @abc.abstractmethod

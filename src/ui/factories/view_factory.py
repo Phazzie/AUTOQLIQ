@@ -7,7 +7,7 @@ import tkinter as tk
 from typing import Any, Optional
 
 from src.core.exceptions import UIError
-from src.ui.views.workflow_editor_view_refactored import WorkflowEditorView
+from src.ui.views.workflow_editor_view_enhanced import WorkflowEditorViewEnhanced
 from src.ui.views.workflow_runner_view_refactored import WorkflowRunnerView
 from src.ui.presenters.workflow_editor_presenter_refactored import WorkflowEditorPresenter
 from src.ui.presenters.workflow_runner_presenter_refactored import WorkflowRunnerPresenter
@@ -49,15 +49,15 @@ class ViewFactory(AbstractFactory[Any]):
         self,
         root: tk.Widget,
         presenter: Optional[WorkflowEditorPresenter] = None
-    ) -> WorkflowEditorView:
-        """Create a workflow editor view.
+    ) -> WorkflowEditorViewEnhanced:
+        """Create an enhanced workflow editor view.
 
         Args:
             root: The root widget
             presenter: The presenter for the view
 
         Returns:
-            A configured workflow editor view
+            A configured enhanced workflow editor view
 
         Raises:
             UIError: If the view cannot be created
@@ -67,16 +67,16 @@ class ViewFactory(AbstractFactory[Any]):
             if presenter is None:
                 presenter = self.presenter_factory.create("workflow_editor")
 
-            # Create the view
-            view = WorkflowEditorView(root, presenter)
+            # Create the enhanced view
+            view = WorkflowEditorViewEnhanced(root, presenter)
 
             # Set the view on the presenter
             presenter.set_view(view)
 
             return view
         except Exception as e:
-            error_msg = "Failed to create workflow editor view"
-            raise UIError(error_msg, component_name="WorkflowEditorView", cause=e)
+            error_msg = "Failed to create enhanced workflow editor view"
+            raise UIError(error_msg, component_name="WorkflowEditorViewEnhanced", cause=e)
 
     def create_workflow_runner_view(
         self,
