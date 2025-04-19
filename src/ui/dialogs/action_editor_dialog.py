@@ -52,19 +52,7 @@ class ActionEditorDialog(tk.Toplevel):
             "true_branch": {"label": "True Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"},
             "false_branch": {"label": "False Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"}
         },
-        "Loop": {
-            "loop_type": {"label": "Loop Type:", "widget": "combobox", "required": True, "options": {"values": ["count", "for_each"]}, "tooltip": "Type of loop"},
-            "count": {"label": "Iterations:", "widget": "entry", "required": False, "options": {"width": 10}, "tooltip": "Required for 'count' loop"},
-            "list_variable_name": {"label": "List Variable:", "widget": "entry", "required": False, "tooltip": "Context variable name holding list for 'for_each'"},
-            "loop_actions": {"label": "Loop Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"}
-        },
-        "ErrorHandling": {
-             "try_actions": {"label": "Try Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"},
-             "catch_actions": {"label": "Catch Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"}
-        },
-        "Template": {
-            "template_name": {"label": "Template Name:", "widget": "entry", "required": True, "tooltip": "Name of the saved template to execute"}
-        }
+        # Removed per YAGNI: Loop, ErrorHandling, Template
         # Add new action types and their parameters here
     }
 

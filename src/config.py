@@ -5,8 +5,8 @@ import os
 import logging
 from typing import Literal, Optional, List
 
-# Define allowed repository types
-RepositoryType = Literal["file_system", "database"]
+# Define repository type (simplified to file_system only per YAGNI)
+RepositoryType = Literal["file_system"]
 # Define allowed browser types (should align with BrowserType enum if possible)
 BrowserTypeStr = Literal["chrome", "firefox", "edge", "safari"]
 
@@ -19,9 +19,7 @@ DEFAULT_CONFIG = {
     'Repository': {
         'type': 'file_system',
         'workflows_path': 'workflows',
-        'credentials_path': 'credentials.json',
-        'create_if_missing': 'true',
-        'db_path': 'autoqliq_data.db'
+        'credentials_path': 'credentials.json'
     },
     'WebDriver': {
         'default_browser': 'chrome',
@@ -156,31 +154,18 @@ class AppConfig:
 
     @property
     def repository_type(self) -> RepositoryType:
-        repo_type = self._get_value('Repository', 'type', DEFAULT_CONFIG['Repository']['type']).lower()
-        if repo_type not in ('file_system', 'database'):
-            self.logger.warning(f"Invalid repository type '{repo_type}'. Defaulting to '{DEFAULT_CONFIG['Repository']['type']}'.")
-            return DEFAULT_CONFIG['Repository']['type'] # type: ignore
-        return repo_type # type: ignore
+        # Simplified to always return 'file_system' per YAGNI
+        return 'file_system'
 
     @property
     def workflows_path(self) -> str:
-        # Return path based on type, falling back to defaults if key missing
-        repo_type = self.repository_type
-        # Determine key and fallback based on repo type
-        key = 'db_path' if repo_type == 'database' else 'workflows_path'
-        fallback = DEFAULT_CONFIG['Repository'][key]
-        return self._get_value('Repository', key, fallback)
+        # Simplified to always use workflows_path per YAGNI
+        return self._get_value('Repository', 'workflows_path', DEFAULT_CONFIG['Repository']['workflows_path'])
 
     @property
     def credentials_path(self) -> str:
-        repo_type = self.repository_type
-        key = 'db_path' if repo_type == 'database' else 'credentials_path'
-        fallback = DEFAULT_CONFIG['Repository'][key]
-        return self._get_value('Repository', key, fallback)
-
-    @property
-    def db_path(self) -> str:
-         return self._get_value('Repository', 'db_path', DEFAULT_CONFIG['Repository']['db_path'])
+        # Simplified to always use credentials_path per YAGNI
+        return self._get_value('Repository', 'credentials_path', DEFAULT_CONFIG['Repository']['credentials_path'])
 
     @property
     def repo_create_if_missing(self) -> bool:
