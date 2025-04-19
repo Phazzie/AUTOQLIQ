@@ -1,13 +1,15 @@
 """Custom dialog for adding/editing workflow actions."""
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import logging
+import os
 from typing import Optional, Dict, Any, List
 
 from src.core.exceptions import ValidationError, UIError, ActionError
 from src.core.actions.factory import ActionFactory # To get action types and create for validation
 from src.ui.common.ui_factory import UIFactory
+from src.ui.dialogs.action_selection_dialog import ActionSelectionDialog
 # Assuming Action parameter specs are defined or accessible
 # For now, use the hardcoded spec within this file.
 # from .action_param_specs import ACTION_PARAMS # Ideal approach
@@ -50,19 +52,7 @@ class ActionEditorDialog(tk.Toplevel):
             "true_branch": {"label": "True Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"},
             "false_branch": {"label": "False Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"}
         },
-        "Loop": {
-            "loop_type": {"label": "Loop Type:", "widget": "combobox", "required": True, "options": {"values": ["count", "for_each"]}, "tooltip": "Type of loop"},
-            "count": {"label": "Iterations:", "widget": "entry", "required": False, "options": {"width": 10}, "tooltip": "Required for 'count' loop"},
-            "list_variable_name": {"label": "List Variable:", "widget": "entry", "required": False, "tooltip": "Context variable name holding list for 'for_each'"},
-            "loop_actions": {"label": "Loop Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"}
-        },
-        "ErrorHandling": {
-             "try_actions": {"label": "Try Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"},
-             "catch_actions": {"label": "Catch Actions:", "widget": "label_readonly", "required": False, "tooltip": "Edit in main list"}
-        },
-        "Template": {
-            "template_name": {"label": "Template Name:", "widget": "entry", "required": True, "tooltip": "Name of the saved template to execute"}
-        }
+        # Removed per YAGNI: Loop, ErrorHandling, Template
         # Add new action types and their parameters here
     }
 
@@ -112,10 +102,32 @@ class ActionEditorDialog(tk.Toplevel):
         action_types = ActionFactory.get_registered_action_types()
         if not action_types: raise UIError("No action types registered.")
 
-        self.type_combobox = UIFactory.create_combobox(
-            main_frame, textvariable=self._action_type_var, values=action_types, state="readonly", width=48
+        # Create a frame for the action type selection
+        type_frame = UIFactory.create_frame(main_frame)
+        type_frame.grid(row=row, column=1, sticky=tk.EW, padx=5, pady=5)
+        type_frame.columnconfigure(0, weight=1)
+
+        # Create a label to display the selected action type
+        self._type_label = UIFactory.create_label(
+            type_frame,
+            textvariable=self._action_type_var,
+            width=30,
+            anchor=tk.W,
+            relief=tk.SUNKEN,
+            borderwidth=1,
+            padding=(5, 2)
         )
-        self.type_combobox.grid(row=row, column=1, sticky=tk.EW, padx=5, pady=5)
+        self._type_label.grid(row=0, column=0, sticky=tk.EW)
+
+        # Create a button to open the action selection dialog
+        select_button = UIFactory.create_button(
+            type_frame,
+            text="Select...",
+            command=self._show_action_selection_dialog,
+            width=10
+        )
+        select_button.grid(row=0, column=1, padx=(5, 0))
+
         # Set initial type before trace, otherwise trace runs with default empty value first
         initial_type = self.initial_data.get("type", action_types[0])
         if initial_type not in action_types: initial_type = action_types[0]
@@ -359,6 +371,21 @@ class ActionEditorDialog(tk.Toplevel):
         pos_x = max(0, min(pos_x, screen_w - win_w)); pos_y = max(0, min(pos_y, screen_h - win_h))
         self.geometry(f"+{pos_x}+{pos_y}")
 
+
+    def _show_action_selection_dialog(self):
+        """Show the action selection dialog and update the action type."""
+        try:
+            # Create and show the action selection dialog
+            dialog = ActionSelectionDialog(self)
+            selected_action = dialog.show()
+
+            # Update the action type if an action was selected
+            if selected_action:
+                self._action_type_var.set(selected_action)
+                # The trace callback will handle updating the parameter fields
+        except Exception as e:
+            logger.error(f"Error showing action selection dialog: {e}", exc_info=True)
+            messagebox.showerror("Dialog Error", f"Could not open action selection dialog: {e}", parent=self)
 
     def show(self) -> Optional[Dict[str, Any]]:
         """Make the dialog visible and wait for user interaction."""

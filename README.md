@@ -4,7 +4,7 @@
 
 ## Overview
 
-AutoQliq is a Python-based desktop application designed to automate web tasks using Selenium and Tkinter. The application follows SOLID, DRY, and KISS principles with an MVP (Model-View-Presenter) architecture for the UI and a layered approach for backend components. The core functionality allows users to create, edit, save, and run automated web workflows. Persistence can be configured to use either JSON files or an SQLite database. Control flow (conditionals, loops), error handling (try/catch), and action templates are supported.
+AutoQliq is a Python-based desktop application designed to automate web tasks using Selenium and Tkinter. The application follows SOLID, DRY, and KISS principles with an MVP (Model-View-Presenter) architecture for the UI and a layered approach for backend components. The core functionality allows users to create, edit, save, and run automated web workflows. Workflows are stored as JSON files in the file system. Basic control flow (conditionals) is supported.
 
 ## Project Structure
 
@@ -13,28 +13,26 @@ AutoQliq/
 ├── requirements.txt              # Python package dependencies
 ├── config.ini                    # Application configuration settings
 ├── README.md                     # This file
-├── credentials.json              # Example credential file (if using file_system repo)
-├── workflows/                    # Example workflow directory (if using file_system repo)
+├── credentials.json              # Credential file
+├── workflows/                    # Workflow directory
 │   └── example_workflow.json     # Example workflow definition
-├── templates/                    # Example template directory (if using file_system repo)
-│   └── example_template.json   # Example template definition
 ├── logs/                         # Directory where execution logs are saved
 ├── exports/                      # Directory where context exports are saved
 ├── test_data/                    # Directory for test data and samples
 ├── archive/                      # Directory for archived content
-├── autoqliq_data.db              # Example database file (if using database repo)
+
 ├── src/
 │   ├── __init__.py
 │   ├── config.py                 # Loads and provides config.ini settings
 │   ├── core/                     # Core domain logic and interfaces
 │   │   ├── interfaces/           # Core interfaces (Action, Repository, WebDriver, Service)
-│   │   ├── actions/              # Concrete Action implementations (incl. Conditional, Loop, ErrorHandling, Template)
+│   │   ├── actions/              # Concrete Action implementations (incl. Conditional)
 │   │   ├── workflow/             # Workflow execution logic (Runner)
 │   │   ├── exceptions.py         # Custom application exceptions
 │   │   └── action_result.py      # ActionResult class
 │   ├── infrastructure/           # Implementation of external concerns
 │   │   ├── common/               # Shared utilities
-│   │   ├── repositories/         # Persistence implementations (FS, DB for Workflows, Credentials, Templates)
+│   │   ├── repositories/         # Persistence implementations (File System for Workflows, Credentials)
 │   │   └── webdrivers/           # WebDriver implementations (Selenium)
 │   ├── application/              # Application service layer
 │   │   ├── services/             # Service implementations (Credential, Workflow, WebDriver, Scheduler[stub], Reporting[basic])
@@ -66,8 +64,7 @@ AutoQliq/
 
 Application behavior is configured via `config.ini`. Key settings:
 
-- `[Repository] type`: `file_system` or `database`.
-- `[Repository] paths`: Set `workflows_path`, `credentials_path`, `db_path` as needed for the chosen type. Templates use a `templates` subdir relative to `workflows_path` (FS) or a `templates` table (DB).
+- `[Repository] paths`: Set `workflows_path` and `credentials_path` for file storage locations.
 - `[WebDriver] default_browser`: `chrome`, `firefox`, `edge`, `safari`.
 - `[WebDriver] *_driver_path`: Optional explicit paths to WebDriver executables.
 - `[WebDriver] implicit_wait`: Default implicit wait time (seconds).
@@ -85,15 +82,13 @@ A default `config.ini` is created if missing. Settings can be modified via the "
 ## Usage
 
 1.  **Configure `config.ini`** (or use defaults/Settings tab).
-2.  **Manage Credentials**: Use the "Manage" -> "Credentials..." menu item. Passwords are hashed on save. **Note:** Existing plaintext passwords need re-saving via UI.
-3.  **Manage Workflows/Templates**: Use the "Workflow Editor" tab.
-    - Create/Edit/Delete workflows.
-    - Save reusable sequences as templates (currently requires manual file/DB operation - UI needed).
-    - Use the `TemplateAction` type in the Action Editor to reference a saved template by name.
+2.  **Manage Credentials**: Use the "Manage" -> "Credentials..." menu item. Passwords are hashed on save.
+3.  **Manage Workflows**: Use the "Workflow Editor" tab.
+    - Create/Edit/Delete workflows with basic and conditional actions.
+    - Build sequences of actions to automate web tasks.
 4.  **Run Workflows**: Use the "Workflow Runner" tab. Select workflow/credential, click "Run". Execution is backgrounded; logs appear. Use "Stop" to request cancellation.
 5.  **Manage Settings**: Use the "Settings" tab to view/modify configuration. Click "Save Settings" to persist changes.
 6.  **Execution Logs**: Execution logs are saved in the `logs/` directory.
-7.  **Context Exports**: Context exports are saved in the `exports/` directory.
 
 ## Workflow Action Types
 
@@ -105,19 +100,10 @@ Workflows are lists of action dictionaries. Supported `type` values:
 - `Wait`: Pauses execution (`duration_seconds`).
 - `Screenshot`: Takes a screenshot (`file_path`).
 - `Conditional`: Executes actions based on a condition.
-  - `condition_type`: 'element_present', 'element_not_present', 'variable_equals', 'javascript_eval'.
-  - Requires parameters like `selector`, `variable_name`, `expected_value`, `script` based on `condition_type`.
+  - `condition_type`: 'element_present', 'element_not_present', 'variable_equals'.
+  - Requires parameters like `selector`, `variable_name`, `expected_value` based on `condition_type`.
   - `true_branch`: List of actions if condition is true.
   - `false_branch`: List of actions if condition is false.
-- `Loop`: Repeats actions.
-  - `loop_type`: 'count', 'for_each', 'while'.
-  - Requires parameters like `count`, `list_variable_name`, or condition parameters based on `loop_type`.
-  - `loop_actions`: List of actions to repeat. Context variables `loop_index`, `loop_iteration`, `loop_total`, `loop_item` are available to nested actions.
-- `ErrorHandling`: Executes 'try' actions, runs 'catch' actions on failure.
-  - `try_actions`: List of actions to attempt.
-  - `catch_actions`: List of actions to run if try block fails. Context variables `try_block_error_message`, `try_block_error_type` available in catch.
-- `Template`: Executes a saved template.
-  - `template_name`: The name of the saved template to execute.
 
 _(See `ActionEditorDialog` or action class docstrings for specific parameters)_
 

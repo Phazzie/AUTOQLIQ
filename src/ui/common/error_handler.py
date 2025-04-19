@@ -3,6 +3,8 @@ import logging
 import tkinter as tk
 from tkinter import messagebox
 from typing import Optional, Callable, Dict, Any, List, Union
+import functools
+import inspect
 
 from src.core.exceptions import AutoQliqError, UIError, WorkflowError, CredentialError, WebDriverError, ValidationError
 

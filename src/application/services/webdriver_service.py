@@ -41,8 +41,6 @@ class WebDriverService(IWebDriverService):
         self,
         browser_type_str: Optional[str] = None, # Make optional, use config default
         selenium_options: Optional[Any] = None, # Specific options object
-        playwright_options: Optional[Dict[str, Any]] = None, # Specific options dict
-        driver_type: str = "selenium", # 'selenium' or 'playwright'
         **kwargs: Any # Allow passing other factory options like implicit_wait_seconds
     ) -> IWebDriver:
         """Create a new web driver instance using the factory and configuration.
@@ -51,15 +49,13 @@ class WebDriverService(IWebDriverService):
             browser_type_str: Optional name of the browser type (e.g., "chrome").
                               If None, uses default from config.
             selenium_options: Specific Selenium options object (e.g., ChromeOptions).
-            playwright_options: Specific Playwright launch options dictionary.
-            driver_type: The driver backend ('selenium' or 'playwright').
             **kwargs: Additional arguments passed to the factory (e.g., `implicit_wait_seconds`, `webdriver_path`).
 
         Returns:
             A configured web driver instance conforming to IWebDriver.
         """
         browser_to_use_str = browser_type_str or config.default_browser
-        logger.info(f"SERVICE: Requesting creation of {driver_type} driver for browser '{browser_to_use_str}'")
+        logger.info(f"SERVICE: Requesting creation of Selenium driver for browser '{browser_to_use_str}'")
 
         try:
             # Convert string to BrowserType enum
@@ -85,12 +81,10 @@ class WebDriverService(IWebDriverService):
         # Delegate creation to the factory
         driver = self.webdriver_factory.create_driver(
             browser_type=browser_enum,
-            driver_type=driver_type,
             selenium_options=selenium_options,
-            playwright_options=playwright_options,
             **factory_args
         )
-        logger.info(f"SERVICE: Successfully created {driver_type} driver for {browser_to_use_str}.")
+        logger.info(f"SERVICE: Successfully created Selenium driver for {browser_to_use_str}.")
         return driver
 
     @log_method_call(logger)

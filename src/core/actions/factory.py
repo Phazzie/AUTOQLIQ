@@ -23,9 +23,6 @@ from src.core.actions.navigation import NavigateAction
 from src.core.actions.interaction import ClickAction, TypeAction
 from src.core.actions.utility import WaitAction, ScreenshotAction
 from src.core.actions.conditional_action import ConditionalAction
-from src.core.actions.loop_action import LoopAction
-from src.core.actions.error_handling_action import ErrorHandlingAction
-from src.core.actions.template_action import TemplateAction
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +106,3 @@ ActionFactory.register_action(TypeAction)
 ActionFactory.register_action(WaitAction)
 ActionFactory.register_action(ScreenshotAction)
 ActionFactory.register_action(ConditionalAction)
-ActionFactory.register_action(LoopAction)
-ActionFactory.register_action(ErrorHandlingAction)
-ActionFactory.register_action(TemplateAction)

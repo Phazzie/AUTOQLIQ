@@ -61,11 +61,9 @@ class SettingsPresenter(BasePresenter[ISettingsView]):
         settings_data = {
             'log_level': logging.getLevelName(self.config.log_level),
             'log_file': self.config.log_file,
-            'repository_type': self.config.repository_type,
+            # Repository type is fixed to file_system per YAGNI
             'workflows_path': self.config.workflows_path,
             'credentials_path': self.config.credentials_path,
-            'db_path': self.config.db_path,
-            'repo_create_if_missing': self.config.repo_create_if_missing,
             'default_browser': self.config.default_browser,
             'chrome_driver_path': self.config.get_driver_path('chrome') or "",
             'firefox_driver_path': self.config.get_driver_path('firefox') or "",
@@ -90,15 +88,9 @@ class SettingsPresenter(BasePresenter[ISettingsView]):
 
         # --- Basic Validation (Presenter-level) ---
         errors = {}
-        # Validate paths (basic check for emptiness if relevant)
-        repo_type = settings_to_save.get('repository_type')
-        if repo_type == 'file_system':
-            if not settings_to_save.get('workflows_path'): errors['workflows_path'] = ["Workflows path required."]
-            if not settings_to_save.get('credentials_path'): errors['credentials_path'] = ["Credentials path required."]
-        elif repo_type == 'database':
-             if not settings_to_save.get('db_path'): errors['db_path'] = ["Database path required."]
-        else:
-            errors['repository_type'] = ["Invalid repository type selected."]
+        # Validate paths (basic check for emptiness)
+        if not settings_to_save.get('workflows_path'): errors['workflows_path'] = ["Workflows path required."]
+        if not settings_to_save.get('credentials_path'): errors['credentials_path'] = ["Credentials path required."]
 
         # Validate implicit wait
         try:
@@ -128,7 +120,7 @@ class SettingsPresenter(BasePresenter[ISettingsView]):
             success = True
             # Use getattr to avoid repeating; assumes setting_key matches config property name
             sections = {'General': ['log_level', 'log_file'],
-                        'Repository': ['type', 'workflows_path', 'credentials_path', 'db_path', 'create_if_missing'],
+                        'Repository': ['workflows_path', 'credentials_path'],
                         'WebDriver': ['default_browser', 'implicit_wait', 'chrome_driver_path', 'firefox_driver_path', 'edge_driver_path']}
 
             for section, keys in sections.items():

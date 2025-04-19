@@ -4,6 +4,7 @@ from tkinter import ttk
 from typing import Callable, List, Dict, Any, Optional, Union
 
 from src.core.exceptions import UIError
+from src.ui.common.service_provider import ServiceProvider
 
 
 class UIFactory:
@@ -12,6 +13,14 @@ class UIFactory:
     This class provides methods for creating common UI components with consistent
     styling and behavior. It primarily uses ttk widgets for a modern look.
     """
+
+    def __init__(self, service_provider: Optional[ServiceProvider] = None):
+        """Initialize a new UIFactory.
+
+        Args:
+            service_provider: The service provider for dependency injection.
+        """
+        self.service_provider = service_provider or ServiceProvider()
 
     @staticmethod
     def create_frame(parent: tk.Widget, padding: Union[str, int] = "10", relief: str = tk.FLAT, **kwargs) -> ttk.Frame:
@@ -315,6 +324,62 @@ class UIFactory:
         except Exception as e:
             error_msg = "Failed to create separator"
             raise UIError(error_msg, component_name="Separator", cause=e) from e
+
+    # --- Dialog Methods ---
+
+    @staticmethod
+    def show_message_dialog(title: str, message: str, parent: Optional[tk.Widget] = None) -> None:
+        """Show a message dialog.
+
+        Args:
+            title: The title of the dialog
+            message: The message to display
+            parent: The parent widget
+        """
+        from tkinter import messagebox
+        messagebox.showinfo(title, message, parent=parent)
+
+    @staticmethod
+    def show_input_dialog(title: str, prompt: str, parent: Optional[tk.Widget] = None) -> Optional[str]:
+        """Show an input dialog.
+
+        Args:
+            title: The title of the dialog
+            prompt: The prompt to display
+            parent: The parent widget
+
+        Returns:
+            The user input, or None if the user cancelled
+        """
+        from tkinter import simpledialog
+        return simpledialog.askstring(title, prompt, parent=parent)
+
+    @staticmethod
+    def show_confirmation_dialog(title: str, message: str, parent: Optional[tk.Widget] = None) -> bool:
+        """Show a confirmation dialog.
+
+        Args:
+            title: The title of the dialog
+            message: The message to display
+            parent: The parent widget
+
+        Returns:
+            True if the user confirmed, False otherwise
+        """
+        from tkinter import messagebox
+        return messagebox.askyesno(title, message, parent=parent)
+
+    @staticmethod
+    def show_error_dialog(title: str, message: str, parent: Optional[tk.Widget] = None) -> None:
+        """Show an error dialog.
+
+        Args:
+            title: The title of the dialog
+            message: The message to display
+            parent: The parent widget
+        """
+        from tkinter import messagebox
+        messagebox.showerror(title, message, parent=parent)
 
     # --- Composite Component Creation (moved from ComponentFactory) ---
 

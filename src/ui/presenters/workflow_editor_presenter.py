@@ -162,6 +162,29 @@ class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEdito
         except Exception as e:
              self._handle_error(AutoQliqError("Unexpected error adding action.", cause=e), "adding action")
 
+    def insert_action(self, position: int, action_data: Dict[str, Any]) -> None:
+        """Insert a new action at the specified position in the current workflow."""
+        if not self.view: return
+        if self._current_workflow_name is None:
+             self._handle_error(WorkflowError("No workflow loaded. Cannot insert action."), "inserting action")
+             return
+        if not (0 <= position <= len(self._current_actions)):
+             self._handle_error(IndexError(f"Invalid position for insertion: {position}"), "inserting action")
+             return
+
+        self.logger.debug(f"Attempting to insert action at position {position} in '{self._current_workflow_name}': {action_data.get('type')}")
+        try:
+            new_action = ActionFactory.create_action(action_data) # Raises ActionError/ValidationError
+            new_action.validate() # Raises ValidationError
+            self._current_actions.insert(position, new_action)
+            self._update_action_list_display()
+            self.view.set_status(f"Action '{new_action.name}' inserted at position {position+1} in '{self._current_workflow_name}' (unsaved).")
+            self.logger.info(f"Inserted action {new_action.action_type} at position {position} in internal list for '{self._current_workflow_name}'.")
+        except (ActionError, ValidationError) as e:
+             self._handle_error(e, "inserting action")
+        except Exception as e:
+             self._handle_error(AutoQliqError("Unexpected error inserting action.", cause=e), "inserting action")
+
 
     def update_action(self, index: int, action_data: Dict[str, Any]) -> None:
         """Update an action in the current in-memory list and update view."""
@@ -210,16 +233,54 @@ class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEdito
 
 
     def get_action_data(self, index: int) -> Optional[Dict[str, Any]]:
-         """Get the data dictionary for the action at the specified index."""
-         if not (0 <= index < len(self._current_actions)):
-              self.logger.warning(f"Attempted to get action data for invalid index: {index}")
-              return None
-         try:
-              action = self._current_actions[index]
-              return action.to_dict()
-         except Exception as e:
-              self._handle_error(AutoQliqError(f"Failed to get dictionary for action at index {index}", cause=e), "getting action data")
-              return None
+        """Get the data dictionary for the action at the specified index."""
+        if not (0 <= index < len(self._current_actions)):
+            self.logger.warning(f"Attempted to get action data for invalid index: {index}")
+            return None
+        try:
+            action = self._current_actions[index]
+            return action.to_dict()
+        except Exception as e:
+            self._handle_error(AutoQliqError(f"Failed to get dictionary for action at index {index}", cause=e), "getting action data")
+            return None
+
+    def get_all_actions_data(self) -> List[Dict[str, Any]]:
+        """Get data dictionaries for all actions in the current workflow."""
+        try:
+            return [action.to_dict() for action in self._current_actions]
+        except Exception as e:
+            self._handle_error(AutoQliqError("Failed to get dictionaries for all actions", cause=e), "getting all actions data")
+            return []
+
+    def move_action(self, from_index: int, to_index: int) -> None:
+        """Move an action from one position to another in the current workflow."""
+        if not self.view: return
+        if self._current_workflow_name is None:
+            self._handle_error(WorkflowError("No workflow loaded. Cannot move action."), "moving action")
+            return
+        if not (0 <= from_index < len(self._current_actions)):
+            self._handle_error(IndexError(f"Invalid source index for move: {from_index}"), "moving action")
+            return
+        if not (0 <= to_index < len(self._current_actions)):
+            self._handle_error(IndexError(f"Invalid target index for move: {to_index}"), "moving action")
+            return
+        if from_index == to_index:
+            # No need to move if indices are the same
+            return
+
+        self.logger.debug(f"Attempting to move action from index {from_index} to {to_index} in '{self._current_workflow_name}'")
+        try:
+            # Remove the action from the source position
+            action = self._current_actions.pop(from_index)
+            # Insert it at the target position
+            self._current_actions.insert(to_index, action)
+            self._update_action_list_display()
+            self.view.set_status(f"Action moved from position {from_index+1} to {to_index+1} in '{self._current_workflow_name}' (unsaved).")
+            self.logger.info(f"Moved action from index {from_index} to {to_index} in internal list for '{self._current_workflow_name}'.")
+        except IndexError:
+            self._handle_error(IndexError(f"Action index out of range during move."), "moving action")
+        except Exception as e:
+            self._handle_error(AutoQliqError("Unexpected error moving action.", cause=e), "moving action")
 
     # --- Helper Methods ---
 
@@ -227,10 +288,20 @@ class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEdito
         """Format the current actions and tell the view to display them."""
         if not self.view: return
         try:
-             # Use str(action) which should provide a user-friendly summary
-             actions_display = [f"{i+1}: {str(action)}" for i, action in enumerate(self._current_actions)]
-             self.view.set_action_list(actions_display)
-             self.logger.debug(f"Updated action list display in view for '{self._current_workflow_name}'. Actions: {len(actions_display)}")
+            # Use str(action) which should provide a user-friendly summary for legacy view
+            actions_display = [f"{i+1}: {str(action)}" for i, action in enumerate(self._current_actions)]
+            self.view.set_action_list(actions_display)
+
+            # Also provide action data dictionaries for enhanced view
+            try:
+                actions_data = [action.to_dict() for action in self._current_actions]
+                self.view.set_action_data_list(actions_data)
+            except AttributeError:
+                # View doesn't support set_action_data_list, which is fine for legacy views
+                pass
+
+            self.logger.debug(f"Updated action list display in view for '{self._current_workflow_name}'. Actions: {len(actions_display)}")
         except Exception as e:
             # Use the internal error handler which will log and show error in view
+            from src.core.exceptions import UIError
             self._handle_error(UIError("Failed to update action list display.", cause=e), "updating action list")

@@ -8,11 +8,13 @@ from typing import Dict, List, Any, Optional, Callable # Added Callable
 # Core dependencies
 from src.core.interfaces import IAction, IWorkflowRepository, ICredentialRepository, IWebDriver
 from src.core.interfaces.service import IWorkflowService, IWebDriverService, IReportingService # Added Reporting
-from src.core.workflow.runner import WorkflowRunner
 from src.core.exceptions import WorkflowError, CredentialError, WebDriverError, ValidationError, AutoQliqError, ActionError, RepositoryError, SerializationError, ConfigError
 
 # Infrastructure dependencies
 from src.infrastructure.webdrivers.base import BrowserType
+
+# Application dependencies
+from src.application.services.workflow_executor import WorkflowExecutor
 
 # Common utilities
 from src.infrastructure.common.error_handling import handle_exceptions
@@ -93,66 +95,72 @@ class WorkflowService(IWorkflowService):
         return True
 
     @log_method_call(logger)
-    # Remove decorator - run manages its own logging/error handling/reporting
     def run_workflow(
         self,
         name: str,
         credential_name: Optional[str] = None,
         browser_type: BrowserType = BrowserType.CHROME,
+        driver_type: str = "selenium", # 'selenium' or 'playwright'
         log_callback: Optional[Callable[[str], None]] = None, # Accept callback
         stop_event: Optional[threading.Event] = None # Accept stop event
     ) -> Dict[str, Any]:
-        """Run a workflow, returning detailed execution results and logging them."""
-        logger.info(f"SERVICE: Preparing run: WF='{name}', Cred='{credential_name}', Browser='{browser_type.value}'")
-        driver: Optional[IWebDriver] = None
-        execution_log: Optional[Dict[str, Any]] = None
+        """Run a workflow, returning detailed execution results and logging them.
+
+        This method delegates the actual execution to the WorkflowExecutor, which handles
+        the orchestration of loading actions, creating the driver, running the workflow,
+        and cleaning up resources.
+
+        Args:
+            name: The name of the workflow to execute
+            credential_name: Optional name of credential to use
+            browser_type: The type of browser to use
+            driver_type: The driver implementation to use ('selenium' or 'playwright')
+            log_callback: Optional callback for logging (not currently used)
+            stop_event: Optional event to signal a stop request
+
+        Returns:
+            A dictionary containing the execution results
+
+        Raises:
+            WorkflowError: If the workflow execution fails
+            WebDriverError: If there's an error with the WebDriver
+            Other specific exceptions based on the failure type
+        """
+        logger.info(f"SERVICE: Preparing run: WF='{name}', Cred='{credential_name}', Browser='{browser_type.value}', Driver='{driver_type}'")
 
         try:
-            # 1. Load Actions
-            actions = self.get_workflow(name) # Uses internal method with error handling
+            # Create a workflow executor for this run
+            executor = WorkflowExecutor(
+                workflow_repo=self.workflow_repository,
+                credential_repo=self.credential_repository,
+                webdriver_service=self.webdriver_service,
+                reporting_service=self.reporting_service
+            )
 
-            # 2. Create Driver
-            driver = self.webdriver_service.create_web_driver(browser_type_str=browser_type.value)
+            # Execute the workflow and get the results
+            execution_log = executor.execute(
+                name=name,
+                credential_name=credential_name,
+                browser_type=browser_type,
+                driver_type=driver_type,
+                log_callback=log_callback,
+                stop_event=stop_event
+            )
 
-            # 3. Create Runner and Execute
-            runner = WorkflowRunner(driver, self.credential_repository, self.workflow_repository, stop_event)
-            # Runner returns the full log dictionary
-            execution_log = runner.run(actions, workflow_name=name)
-
-            # 4. Return results (the log dict itself)
+            # Log the result and return
             logger.info(f"SERVICE: Workflow '{name}' execution finished with status: {execution_log.get('final_status')}")
             return execution_log
 
-        except (WorkflowError, CredentialError, WebDriverError, ActionError, ValidationError, RepositoryError, SerializationError, ConfigError, AutoQliqError) as e:
-             logger.error(f"SERVICE: Error during workflow '{name}' execution: {e}", exc_info=True)
-             # Create/update log dict for failure
-             if execution_log is None: # Error likely happened before runner finished
-                  execution_log = { "workflow_name": name, "final_status": "FAILED", "error_message": str(e),
-                                    "start_time_iso": datetime.now().isoformat(), "end_time_iso": datetime.now().isoformat(),
-                                    "duration_seconds": 0.0, "action_results": [] }
-             else: # Runner failed but returned partial log
-                  execution_log["final_status"] = "FAILED"
-                  execution_log["error_message"] = str(e)
-             raise # Re-raise the original specific error for presenter
+        except (WorkflowError, WebDriverError, CredentialError, ValidationError,
+                ActionError, RepositoryError, SerializationError, ConfigError, AutoQliqError) as e:
+            # Log the error and re-raise for the presenter to handle
+            logger.error(f"SERVICE: Error during workflow '{name}' execution: {e}", exc_info=True)
+            raise
+
         except Exception as e:
-             logger.exception(f"SERVICE: Unexpected error running workflow '{name}'")
-             if execution_log is None:
-                  execution_log = { "workflow_name": name, "final_status": "FAILED", "error_message": f"Unexpected error: {e}",
-                                    "start_time_iso": datetime.now().isoformat(), "end_time_iso": datetime.now().isoformat(),
-                                    "duration_seconds": 0.0, "action_results": [] }
-             else:
-                  execution_log["final_status"] = "FAILED"; execution_log["error_message"] = f"Unexpected error: {e}"
-             raise WorkflowError(f"Unexpected error running workflow '{name}'", workflow_name=name, cause=e) from e
-        finally:
-            # 5. Ensure WebDriver Cleanup
-            if driver:
-                try: self.webdriver_service.dispose_web_driver(driver)
-                except Exception as q_e: logger.error(f"SERVICE: Error disposing WebDriver: {q_e}", exc_info=True)
-            # 6. Save Execution Log
-            if execution_log:
-                 try: self.reporting_service.save_execution_log(execution_log)
-                 except Exception as log_e: logger.error(f"SERVICE: Failed save execution log for '{name}': {log_e}", exc_info=True)
-            else: logger.error(f"SERVICE: No execution log generated for '{name}', cannot save log.")
+            # For unexpected errors, wrap in a WorkflowError
+            logger.exception(f"SERVICE: Unexpected error running workflow '{name}'")
+            raise WorkflowError(f"Unexpected error running workflow '{name}'", workflow_name=name, cause=e) from e
 
 
     @log_method_call(logger)
@@ -164,7 +172,6 @@ class WorkflowService(IWorkflowService):
         logger.debug(f"SERVICE: Metadata retrieved for workflow '{name}'.")
         return metadata
 
-# Need datetime for finally block if execution_log is None
-from datetime import datetime
+# No longer need datetime import since execution_log handling is in WorkflowExecutor
 
 ################################################################################

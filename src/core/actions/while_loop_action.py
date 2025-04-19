@@ -1,4 +1,3 @@
-```python
 import logging
 from typing import Dict, Any, Optional, List
 
@@ -140,7 +139,8 @@ class WhileLoopAction(ActionBase):
 
             # --- Use local runner helper for nested execution ---
             # Avoid circular import by importing locally
-            from src.core.workflow.runner import WorkflowRunner, ErrorHandlingStrategy
+            from src.core.workflow.runner import WorkflowRunner
+            from src.core.workflow.error_handling.strategy_enum import ErrorHandlingStrategy
             # Create a temporary runner for the loop body.
             # It inherits driver, repos, but crucially *not* the stop_event from the main runner.
             # Error strategy within the loop body could be configurable, but default to STOP_ON_ERROR for now.
@@ -224,4 +224,3 @@ class WhileLoopAction(ActionBase):
                 f"actions=[{len(self.loop_actions)} actions], max_iter={self.max_iterations})")
 
 # STATUS: COMPLETE ✓
-```

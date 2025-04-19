@@ -9,7 +9,7 @@ import threading
 
 from src.core.interfaces import IWebDriver, IAction, ICredentialRepository, IWorkflowRepository
 from src.core.action_result import ActionResult
-from src.core.workflow.runner import ErrorHandlingStrategy
+from src.core.workflow.error_handling.strategy_enum import ErrorHandlingStrategy
 from src.core.workflow.runner_refactored import WorkflowRunner as RefactoredWorkflowRunner
 from src.core.workflow.template_expander import expand_template
 

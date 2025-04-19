@@ -25,7 +25,11 @@ except ImportError:
     APS_AVAILABLE = False
     # Define dummy classes if not available
     class BackgroundScheduler: # type: ignore
-        def add_job(self,*a,**kw): pass; def get_jobs(self,*a,**kw): return []; def remove_job(self,*a,**kw): raise JobLookupError(); def start(self): pass; def shutdown(self): pass
+        def add_job(self,*a,**kw): pass
+        def get_jobs(self,*a,**kw): return []
+        def remove_job(self,*a,**kw): raise JobLookupError()
+        def start(self): pass
+        def shutdown(self): pass
     class CronTrigger: pass # type: ignore
     class IntervalTrigger: pass # type: ignore
     class JobLookupError(Exception): pass # type: ignore

@@ -11,7 +11,7 @@ import threading
 from src.core.interfaces import IAction
 from src.core.action_result import ActionResult
 from src.core.exceptions import WorkflowError
-from src.core.workflow.runner import ErrorHandlingStrategy
+from src.core.workflow.error_handling.strategy_enum import ErrorHandlingStrategy
 from src.core.workflow.stop_event_checker import check_stop_event
 
 logger = logging.getLogger(__name__)

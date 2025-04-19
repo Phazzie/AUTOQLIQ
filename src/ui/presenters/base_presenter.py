@@ -1,5 +1,6 @@
 """Base presenter class for AutoQliq UI."""
 import logging
+import functools
 from typing import Any, Optional, Dict, List, Callable, TypeVar, Generic
 
 from src.core.exceptions import AutoQliqError, ValidationError
@@ -116,7 +117,5 @@ class BasePresenter(Generic[V], IPresenter):
                     # Re-raising might be needed if the caller needs to react specifically.
                     # Defaulting to returning None here.
                     return None # Or False, or re-raise specific types if needed
-            # Need functools for wraps
-            import functools
             return wrapper
         return decorator

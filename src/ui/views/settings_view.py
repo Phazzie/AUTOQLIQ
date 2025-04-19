@@ -23,8 +23,8 @@ class SettingsView(BaseView, ISettingsView):
     View component for managing application settings. Allows users to view and
     modify settings stored in config.ini.
     """
-    # Define allowed values for dropdowns
-    REPO_TYPES: List[RepositoryType] = ["file_system", "database"]
+    # Define allowed values for dropdowns (simplified per YAGNI)
+    REPO_TYPES: List[RepositoryType] = ["file_system"]
     BROWSER_TYPES: List[BrowserTypeStr] = ["chrome", "firefox", "edge", "safari"]
     LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
@@ -77,10 +77,9 @@ class SettingsView(BaseView, ISettingsView):
         repo_frame.columnconfigure(1, weight=1)
         row_index += 1
 
-        self._create_setting_row(repo_frame, 0, "Storage Type:", "repository_type", "combobox", options={'values': self.REPO_TYPES})
-        self._create_setting_row(repo_frame, 1, "DB Path:", "db_path", "entry_with_browse", options={'browse_type': 'save_as', 'label_note': '(Used if type=database)'})
-        self._create_setting_row(repo_frame, 2, "Workflows Path:", "workflows_path", "entry_with_browse", options={'browse_type': 'directory', 'label_note': '(Used if type=file_system)'})
-        self._create_setting_row(repo_frame, 3, "Credentials Path:", "credentials_path", "entry_with_browse", options={'browse_type': 'save_as', 'label_note': '(Used if type=file_system)'})
+        # Simplified repository settings per YAGNI
+        self._create_setting_row(repo_frame, 0, "Workflows Path:", "workflows_path", "entry_with_browse", options={'browse_type': 'directory'})
+        self._create_setting_row(repo_frame, 1, "Credentials Path:", "credentials_path", "entry_with_browse", options={'browse_type': 'save_as'})
 
         # --- WebDriver Settings ---
         wd_frame = UIFactory.create_label_frame(content_frame, text="WebDriver")
