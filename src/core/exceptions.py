@@ -198,3 +198,45 @@ class UIError(AutoQliqError):
              cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
              return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
         return base_message
+
+
+class ServiceError(AutoQliqError):
+    """Raised for errors originating from the service layer."""
+    def __init__(
+        self,
+        message: str,
+        service_name: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
+        self.service_name = service_name
+        super().__init__(message, cause)
+
+    def _format_message(self) -> str:
+        context = f" (service: {self.service_name})" if self.service_name else ""
+        base_message = f"{self.message}{context}"
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message
+
+
+class SecurityError(AutoQliqError):
+    """Raised for security-related errors."""
+    def __init__(
+        self,
+        message: str,
+        security_issue: Optional[str] = None,
+        cause: Optional[Exception] = None
+    ):
+        self.security_issue = security_issue
+        super().__init__(message, cause)
+
+    def _format_message(self) -> str:
+        context = f" (security issue: {self.security_issue})" if self.security_issue else ""
+        base_message = f"{self.message}{context}"
+        if self.cause:
+             # Ensure cause message is included
+             cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
+             return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
+        return base_message

@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch, call, ANY
 
 # Assuming correct paths for imports
-from src.ui.presenters.workflow_editor_presenter_refactored import WorkflowEditorPresenter
+from src.ui.presenters.workflow_editor_presenter import WorkflowEditorPresenter
 from src.ui.interfaces.view import IWorkflowEditorView
 from src.core.interfaces import IWorkflowRepository, IAction
 from src.core.actions.factory import ActionFactory # Assuming this path
@@ -30,7 +30,7 @@ class TestWorkflowEditorPresenter(unittest.TestCase):
 
         # Patch ActionFactory if its create_action is complex or has side effects
         # For now, assume ActionFactory works correctly or mock its direct usage
-        self.factory_patcher = patch('src.ui.presenters.workflow_editor_presenter_refactored.ActionFactory', spec=ActionFactory)
+        self.factory_patcher = patch('src.ui.presenters.workflow_editor_presenter.ActionFactory', spec=ActionFactory)
         self.mock_action_factory = self.factory_patcher.start()
         self.mock_action_factory.create_action.side_effect = lambda data: MockTestAction(**{k:v for k,v in data.items() if k!='type'})
 

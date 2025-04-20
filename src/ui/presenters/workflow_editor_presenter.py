@@ -59,7 +59,10 @@ class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEdito
     def get_workflow_list(self) -> List[str]:
         """Get the list of available workflow names via the service."""
         self.logger.debug("Fetching workflow list from service.")
-        return self.workflow_service.list_workflows()
+        try:
+            return self.workflow_service.list_workflows()
+        except Exception as e:
+            return self._log_and_return_none(e, "getting workflow list")
 
     @BasePresenter.handle_errors("Loading workflow")
     def load_workflow(self, name: str) -> None:
@@ -90,13 +93,16 @@ class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEdito
         actions_to_save = self._current_actions
 
         # Service handles validation, serialization, saving. Decorator catches errors.
-        success = self.workflow_service.save_workflow(target_name, actions_to_save)
-        if success: # Service method returns bool now
-            self._current_workflow_name = target_name
-            self.view.set_status(f"Workflow '{target_name}' saved successfully.")
-            self.logger.info(f"Successfully saved workflow '{target_name}'.")
-            workflows = self.get_workflow_list()
-            if self.view: self.view.set_workflow_list(workflows or [])
+        try:
+            success = self.workflow_service.save_workflow(target_name, actions_to_save)
+            if success: # Service method returns bool now
+                self._current_workflow_name = target_name
+                self.view.set_status(f"Workflow '{target_name}' saved successfully.")
+                self.logger.info(f"Successfully saved workflow '{target_name}'.")
+                workflows = self.get_workflow_list()
+                if self.view: self.view.set_workflow_list(workflows or [])
+        except Exception as e:
+            self._log_and_raise_error(e, "saving workflow")
 
 
     @BasePresenter.handle_errors("Creating new workflow")
@@ -125,19 +131,22 @@ class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEdito
              raise ValidationError("Workflow name cannot be empty.", field_name="workflow_name")
 
         self.logger.info(f"Deleting workflow: {name}")
-        deleted = self.workflow_service.delete_workflow(name) # Service raises errors
-        if deleted:
-            self.view.set_status(f"Workflow '{name}' deleted.")
-            self.logger.info(f"Successfully deleted workflow '{name}'.")
-            if self._current_workflow_name == name:
-                 self._current_workflow_name = None
-                 self._current_actions = []
-                 self._update_action_list_display()
-            workflows = self.get_workflow_list()
-            if self.view: self.view.set_workflow_list(workflows or [])
-        else:
-             # Service returned False (likely not found)
-             raise WorkflowError(f"Workflow '{name}' not found, cannot delete.", workflow_name=name)
+        try:
+            deleted = self.workflow_service.delete_workflow(name) # Service raises errors
+            if deleted:
+                self.view.set_status(f"Workflow '{name}' deleted.")
+                self.logger.info(f"Successfully deleted workflow '{name}'.")
+                if self._current_workflow_name == name:
+                     self._current_workflow_name = None
+                     self._current_actions = []
+                     self._update_action_list_display()
+                workflows = self.get_workflow_list()
+                if self.view: self.view.set_workflow_list(workflows or [])
+            else:
+                 # Service returned False (likely not found)
+                 raise WorkflowError(f"Workflow '{name}' not found, cannot delete.", workflow_name=name)
+        except Exception as e:
+            self._log_and_return_false(e, "deleting workflow")
 
 
     # --- Action Management (Operate on internal state, save separately) ---
@@ -218,8 +227,7 @@ class WorkflowEditorPresenter(BasePresenter[IWorkflowEditorView], IWorkflowEdito
               action = self._current_actions[index]
               return action.to_dict()
          except Exception as e:
-              self._handle_error(AutoQliqError(f"Failed to get dictionary for action at index {index}", cause=e), "getting action data")
-              return None
+              return self._log_and_return_none(e, f"getting action data for index {index}")
 
     # --- Helper Methods ---
 

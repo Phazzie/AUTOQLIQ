@@ -168,6 +168,38 @@ class TestWorkflowRunnerPresenter(unittest.TestCase):
         # Act - Should not raise an exception
         self.presenter.cleanup()
 
+    def test_load_workflow(self):
+        # Act
+        result = self.presenter.load_workflow(self.test_workflow_name)
+
+        # Assert
+        self.workflow_repository.load_workflow.assert_called_once_with(self.test_workflow_name)
+        self.assertEqual(result, self.test_actions)
+
+    def test_get_credential(self):
+        # Act
+        result = self.presenter.get_credential(self.test_credential_name)
+
+        # Assert
+        self.credential_repository.get_by_name.assert_called_once_with(self.test_credential_name)
+        self.assertEqual(result, self.test_credential)
+
+    def test_create_webdriver(self):
+        # Act
+        result = self.presenter.create_webdriver()
+
+        # Assert
+        self.webdriver_factory.create_webdriver.assert_called_once()
+        self.assertEqual(result, self.mock_webdriver)
+
+    def test_run_workflow_actions(self):
+        # Act
+        result = self.presenter.run_workflow_actions(self.test_actions, self.mock_webdriver, self.test_credential)
+
+        # Assert
+        self.workflow_runner.run_workflow.assert_called_once_with(self.test_actions, self.mock_webdriver, self.test_credential)
+        self.assertTrue(result)
+
 
 if __name__ == "__main__":
     unittest.main()
