@@ -136,7 +136,13 @@ _(See `ActionEditorDialog` or action class docstrings for specific parameters)_
 
 ## Contributing
 
-Contributions welcome!
+Contributions welcome! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+5. Ensure all tests pass
 
 ## License
 
