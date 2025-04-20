@@ -4,7 +4,7 @@ import logging
 import threading
 import time
 import tkinter as tk # Only needed for type hints potentially, avoid direct use
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Callable
 
 # Core dependencies
 from src.core.exceptions import WorkflowError, CredentialError, WebDriverError, AutoQliqError, ValidationError, ActionError

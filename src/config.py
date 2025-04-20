@@ -15,6 +15,8 @@ DEFAULT_CONFIG = {
     'General': {
         'log_level': 'INFO',
         'log_file': 'autoqliq_app.log',
+        'window_title': 'AutoQliq',
+        'window_geometry': '1024x768',
     },
     'Repository': {
         'type': 'file_system',
@@ -237,6 +239,14 @@ class AppConfig:
              fallback_len = int(DEFAULT_CONFIG['Security']['password_salt_length'])
              self.logger.warning(f"Invalid integer value for 'password_salt_length'. Using default: {fallback_len}.")
              return fallback_len
+
+    @property
+    def WINDOW_TITLE(self) -> str:
+        return self._get_value('General', 'window_title', DEFAULT_CONFIG['General']['window_title'])
+
+    @property
+    def WINDOW_GEOMETRY(self) -> str:
+        return self._get_value('General', 'window_geometry', DEFAULT_CONFIG['General']['window_geometry'])
 
 
 # --- Global Singleton Instance ---

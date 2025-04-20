@@ -57,9 +57,16 @@ def main():
     logger.info(f"Workflows Path: {config.workflows_path}")
     logger.info(f"Credentials Path: {config.credentials_path}")
 
-    root = tk.Tk()
-    root.title(config.WINDOW_TITLE)
-    root.geometry(config.WINDOW_GEOMETRY)
+    try:
+        root = tk.Tk()
+        root.title(config.WINDOW_TITLE)
+        root.geometry(config.WINDOW_GEOMETRY)
+    except Exception as e:
+        logger.exception(f"Failed to initialize Tkinter: {e}")
+        print(f"ERROR: Failed to initialize Tkinter: {e}")
+        print("This may be due to compatibility issues with your operating system.")
+        print("Please check the log file for more details.")
+        return
 
     try:
         # Create repositories
