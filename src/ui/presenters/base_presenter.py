@@ -88,6 +88,21 @@ class BasePresenter(Generic[V], IPresenter):
         else:
              self.logger.warning(f"Cannot display error in view (view not set) for context: {context}")
 
+    def _log_and_raise_error(self, error: Exception, context: str) -> None:
+        """Log the error and raise it."""
+        self.logger.error(f"Error in {context}: {str(error)}", exc_info=True)
+        raise error
+
+    def _log_and_return_none(self, error: Exception, context: str) -> Optional[Any]:
+        """Log the error and return None."""
+        self.logger.error(f"Error in {context}: {str(error)}", exc_info=True)
+        return None
+
+    def _log_and_return_false(self, error: Exception, context: str) -> bool:
+        """Log the error and return False."""
+        self.logger.error(f"Error in {context}: {str(error)}", exc_info=True)
+        return False
+
     # Optional: Decorator within the base class for convenience
     @classmethod
     def handle_errors(cls, context: str) -> Callable[[Callable], Callable]:
