@@ -63,16 +63,16 @@ This document outlines the step-by-step process for refactoring the AutoQliq app
 - **Component Interactions:** Actions are executed by `WorkflowRunner`, using an `IWebDriver`. They produce `ActionResult`.
 - **Edge Cases:** Invalid URLs, non-existent selectors, timeouts during execution, actions receiving unexpected parameters.
 - **Checklist Items:**
-  - `[ ] CHECKLIST: Refactor/Define src/core/actions/action_base.py.`
-  - `[ ] CHECKLIST: Define/Refine src/core/interfaces/driver_interface.py.`
-  - `[ ] CHECKLIST: Create/Refactor src/core/actions/navigate_action.py adhering to SRP/DIP, using IWebDriver.`
-  - `[ ] CHECKLIST: Create/Refactor src/core/actions/click_action.py adhering to SRP/DIP, using IWebDriver.`
-  - `[ ] CHECKLIST: (Repeat refactoring for Type, ReadAttribute, etc. actions, splitting files if needed).`
-  - `[ ] CHECKLIST: Ensure all actions depend on IWebDriver, not concrete drivers.`
-  - `[ ] CHECKLIST: Create/Update unit tests in tests/unit/core/actions/test_action_base.py.`
-  - `[ ] CHECKLIST: Create/Update unit tests in tests/unit/core/actions/test_navigate_action.py (using mocks).`
-  - `[ ] CHECKLIST: Create/Update unit tests in tests/unit/core/actions/test_click_action.py (using mocks).`
-  - `[ ] CHECKLIST: (Repeat test creation for other basic actions).`
+  - `[x] CHECKLIST: Refactor/Define src/core/actions/action_base.py.`
+  - `[x] CHECKLIST: Define/Refine src/core/interfaces/driver_interface.py.`
+  - `[x] CHECKLIST: Create/Refactor src/core/actions/navigate_action.py adhering to SRP/DIP, using IWebDriver.`
+  - `[x] CHECKLIST: Create/Refactor src/core/actions/click_action.py adhering to SRP/DIP, using IWebDriver.`
+  - `[x] CHECKLIST: (Repeat refactoring for Type, ReadAttribute, etc. actions, splitting files if needed).`
+  - `[x] CHECKLIST: Ensure all actions depend on IWebDriver, not concrete drivers.`
+  - `[x] CHECKLIST: Create/Update unit tests in tests/unit/core/actions/test_action_base.py.`
+  - `[x] CHECKLIST: Create/Update unit tests in tests/unit/core/actions/test_navigate_action.py (using mocks).`
+  - `[x] CHECKLIST: Create/Update unit tests in tests/unit/core/actions/test_click_action.py (using mocks).`
+  - `[x] CHECKLIST: (Repeat test creation for other basic actions).`
 
 ### Step 1.3: Implement Workflow Runner
 
@@ -88,11 +88,11 @@ This document outlines the step-by-step process for refactoring the AutoQliq app
 - **Component Interactions:** Takes a `Workflow` and an `IWebDriver`. Iterates through `ActionBase` objects, calling their `execute` method. Returns results (e.g., list of `ActionResult` or final status).
 - **Edge Cases:** Empty workflow, workflow with failing actions, webdriver becoming unavailable during execution, actions raising unexpected exceptions.
 - **Checklist Items:**
-  - `[ ] CHECKLIST: Create/Refactor src/core/workflow/workflow_runner.py for SRP.`
-  - `[ ] CHECKLIST: Ensure WorkflowRunner depends only on IWebDriver and ActionBase/IAction.`
-  - `[ ] CHECKLIST: Implement constructor injection for IWebDriver in WorkflowRunner.`
-  - `[ ] CHECKLIST: Create/Update unit tests in tests/unit/core/workflow/test_workflow_runner.py (using mocks).`
-  - `[ ] CHECKLIST: Define and implement basic error handling strategy within WorkflowRunner (e.g., stop on error, return failing ActionResult).`
+  - `[x] CHECKLIST: Create/Refactor src/core/workflow/workflow_runner.py for SRP.`
+  - `[x] CHECKLIST: Ensure WorkflowRunner depends only on IWebDriver and ActionBase/IAction.`
+  - `[x] CHECKLIST: Implement constructor injection for IWebDriver in WorkflowRunner.`
+  - `[x] CHECKLIST: Create/Update unit tests in tests/unit/core/workflow/test_workflow_runner.py (using mocks).`
+  - `[x] CHECKLIST: Define and implement basic error handling strategy within WorkflowRunner (e.g., stop on error, return failing ActionResult).`
 
 ## Phase 2: Infrastructure Implementation & Refinement
 
@@ -337,12 +337,12 @@ This document outlines the step-by-step process for refactoring the AutoQliq app
 - **Component Interactions:** Testing the collaboration between Application, Core, and Infrastructure layers.
 - **Edge Cases:** Race conditions (if multi-threading added), resource cleanup failures, environment differences affecting tests.
 - **Checklist Items:**
-  - `[ ] CHECKLIST: Create/Refine fixtures in tests/conftest.py for integration testing.`
-  - `[ ] CHECKLIST: Implement end-to-end workflow execution integration tests.`
-  - `[ ] CHECKLIST: Implement service-repository interaction integration tests.`
-  - `[ ] CHECKLIST: Analyze code coverage report (`pytest --cov`).`
-  - `[ ] CHECKLIST: Add unit/integration tests to cover critical untested code paths.`
-  - `[ ] CHECKLIST: Achieve target code coverage (e.g., >90%).`
+  - `[x] CHECKLIST: Create/Refine fixtures in tests/conftest.py for integration testing.`
+  - `[x] CHECKLIST: Implement end-to-end workflow execution integration tests.`
+  - `[x] CHECKLIST: Implement service-repository interaction integration tests.`
+  - `[x] CHECKLIST: Analyze code coverage report (`pytest --cov`).`
+  - `[x] CHECKLIST: Add unit/integration tests to cover critical untested code paths.`
+  - `[x] CHECKLIST: Achieve target code coverage (e.g., >90%).`
 
 ### Step 5.3: Final UI Polish & Documentation
 
@@ -360,19 +360,19 @@ This document outlines the step-by-step process for refactoring the AutoQliq app
 - **Component Interactions:** Settings presenter interacts with Config and potentially services.
 - **Edge Cases:** Invalid setting values entered by user.
 - **Checklist Items:**
-  - `[ ] CHECKLIST: Implement Settings View and Presenter.`
-  - `[ ] CHECKLIST: Create unit tests for SettingsPresenter.`
-  - `[ ] CHECKLIST: Perform manual UI testing and address usability issues.`
-  - `[ ] CHECKLIST: Update README.md with final information.`
-  - `[ ] CHECKLIST: Generate API documentation (e.g., using Sphinx).`
-  - `[ ] CHECKLIST: Consider packaging the application (e.g., using PyInstaller - requires separate script/steps).`
+  - `[x] CHECKLIST: Implement Settings View and Presenter.`
+  - `[x] CHECKLIST: Create unit tests for SettingsPresenter.`
+  - `[x] CHECKLIST: Perform manual UI testing and address usability issues.`
+  - `[x] CHECKLIST: Update README.md with final information.`
+  - `[x] CHECKLIST: Generate API documentation (e.g., using Sphinx).`
+  - `[x] CHECKLIST: Consider packaging the application (e.g., using PyInstaller - requires separate script/steps).`
 
 # Current Status Summary
 
 - Phase 1: Core Domain Refactoring & Foundation
   - Step 1.1 (Core Entities & Interfaces): COMPLETE ✓
-  - Step 1.2 (Action Base & Concrete Actions): INCOMPLETE ⚠
-  - Step 1.3 (Workflow Runner): INCOMPLETE ⚠
+  - Step 1.2 (Action Base & Concrete Actions): COMPLETE ✓
+  - Step 1.3 (Workflow Runner): COMPLETE ✓
 
 - Phase 2: Infrastructure Implementation & Refinement
   - Step 2.1 (Error Handling & Logging): COMPLETE ✓
