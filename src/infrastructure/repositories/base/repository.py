@@ -12,7 +12,7 @@ from src.infrastructure.common.validators import EntityValidator
 # Type variable for the entity type managed by the repository
 T = TypeVar('T')
 
-class Repository(abc.ABC):
+class Repository(abc.ABC, Generic[T]):
     """
     Abstract base class for repository implementations.
 

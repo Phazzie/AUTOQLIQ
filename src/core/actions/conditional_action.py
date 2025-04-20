@@ -160,11 +160,11 @@ class ConditionalAction(ActionBase):
 
             # --- Execute Chosen Branch ---
             # This action executes its children. Use local runner helper.
-            from src.core.workflow.runner import WorkflowRunner # Local import
-            temp_runner = WorkflowRunner(driver, credential_repo, None, None)
+            from src.core.workflow.workflow_runner import WorkflowRunner
+            temp_runner = WorkflowRunner(driver)
 
             # Pass the *current* context down. Conditional branches don't create new scope.
-            branch_results = temp_runner._execute_actions(branch_to_execute, context or {}, workflow_name=self.name, log_prefix=f"{branch_name}: ")
+            branch_results = temp_runner._execute_actions(branch_to_execute, context or {}, credential_repo=credential_repo, workflow_name=self.name, log_prefix=f"{branch_name}: ")
             # If _execute_actions completes without raising ActionError, the branch succeeded.
 
             logger.info(f"Successfully executed '{branch_name}' branch of '{self.name}'.")

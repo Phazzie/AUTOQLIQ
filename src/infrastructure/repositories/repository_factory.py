@@ -9,6 +9,7 @@ from src.infrastructure.repositories.credential_repository import FileSystemCred
 from src.infrastructure.repositories.database_credential_repository import DatabaseCredentialRepository
 from src.infrastructure.repositories.workflow_repository import FileSystemWorkflowRepository
 from src.infrastructure.repositories.database_workflow_repository import DatabaseWorkflowRepository
+from src.core.template.repository import TemplateRepository
 
 # Type variables for better type hinting
 T = TypeVar('T') # Generic type for repository interface
@@ -126,3 +127,34 @@ class RepositoryFactory:
              if not isinstance(e, (ConfigError, RepositoryError)):
                   raise RepositoryError(error_msg, repository_name="WorkflowRepository", cause=e) from e
              raise # Re-raise ConfigError or RepositoryError
+
+    def create_template_repository(
+        self,
+        directory_path: str = None,
+        **options: Any
+    ) -> TemplateRepository:
+        """
+        Create a template repository instance.
+
+        Args:
+            directory_path: Path to the templates directory. If None, uses the default path.
+            **options: Additional options specific to the repository type.
+
+        Returns:
+            A TemplateRepository instance.
+
+        Raises:
+            RepositoryError: If the repository instantiation fails.
+        """
+        self.logger.info(f"Creating TemplateRepository with directory_path='{directory_path}'")
+
+        try:
+            return TemplateRepository(directory_path=directory_path)
+        except Exception as e:
+            # Catch potential errors during instantiation
+            error_msg = f"Failed to create template repository (directory_path={directory_path}): {e}"
+            self.logger.error(error_msg, exc_info=True)
+            # Wrap unexpected errors in RepositoryError
+            if not isinstance(e, RepositoryError):
+                raise RepositoryError(error_msg, repository_name="TemplateRepository", cause=e) from e
+            raise # Re-raise RepositoryError

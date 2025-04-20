@@ -1,7 +1,8 @@
 """Custom dialog for adding/editing workflow actions."""
 
+import os
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import logging
 from typing import Optional, Dict, Any, List
 

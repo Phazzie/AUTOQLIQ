@@ -85,7 +85,19 @@ class ErrorHandlingAction(ActionBase):
         credential_repo: Optional[ICredentialRepository] = None,
         context: Optional[Dict[str, Any]] = None
     ) -> ActionResult:
-        """Execute the 'try' actions, running 'catch' actions if an error occurs."""
+        """
+        Execute the 'try' actions, running 'catch' actions if an error occurs.
+
+        Args:
+            driver: WebDriver instance to use for execution.
+            credential_repo: Repository for credential access (passed to nested actions).
+            context: Execution context dictionary (will be copied for catch block).
+
+        Returns:
+            ActionResult with success/failure status and message.
+            - Success if try block succeeds or catch block handles an error.
+            - Failure if try block fails and no catch block exists, or if catch block fails.
+        """
         logger.info(f"Executing {self.action_type} action (Name: {self.name}).")
         original_error: Optional[Exception] = None
         original_failure_result: Optional[ActionResult] = None

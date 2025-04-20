@@ -8,6 +8,8 @@ from datetime import datetime # Needed for metadata
 
 # Core dependencies
 from src.core.exceptions import WorkflowError, RepositoryError, ValidationError, SerializationError
+# Import AutoQliqError for error handling
+from src.core.exceptions import AutoQliqError
 from src.core.interfaces import IAction, IWorkflowRepository
 
 # Infrastructure dependencies

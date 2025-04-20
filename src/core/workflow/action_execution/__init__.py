@@ -20,6 +20,7 @@ from src.core.workflow.action_execution.action_failure_handler import ActionFail
 from src.core.workflow.action_execution.action_error_handler import ActionErrorHandler
 from src.core.workflow.action_execution.action_display_formatter import ActionDisplayFormatter
 from src.core.workflow.action_execution.action_execution_manager import ActionExecutionManager
+from src.core.workflow.action_execution.execute_actions import execute_actions
 
 __all__ = [
     # Interfaces
@@ -29,12 +30,13 @@ __all__ = [
     'IActionErrorHandler',
     'IActionDisplayFormatter',
     'IActionExecutionManager',
-    
+
     # Implementations
     'ActionExecutor',
     'ActionTypeDetector',
     'ActionFailureHandler',
     'ActionErrorHandler',
     'ActionDisplayFormatter',
-    'ActionExecutionManager'
+    'ActionExecutionManager',
+    'execute_actions'
 ]

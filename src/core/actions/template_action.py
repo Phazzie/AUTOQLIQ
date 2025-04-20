@@ -70,8 +70,10 @@ class TemplateAction(ActionBase):
         base_dict["template_name"] = self.template_name
         return base_dict
 
-    # TemplateAction does not contain nested actions itself
-    # def get_nested_actions(self) -> List[IAction]: return []
+    def get_nested_actions(self) -> List[IAction]:
+        """Return an empty list as TemplateAction does not contain nested actions itself.
+        The actual template actions are loaded and executed by the WorkflowRunner."""
+        return []
 
     def __str__(self) -> str:
         """User-friendly string representation."""

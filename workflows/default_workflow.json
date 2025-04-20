@@ -1,0 +1,42 @@
+[
+  {
+    "type": "Navigate",
+    "name": "Navigate to website",
+    "url": "https://example.com"
+  },
+  {
+    "type": "Wait",
+    "name": "Wait for page to load",
+    "duration_seconds": 2
+  },
+  {
+    "type": "Click",
+    "name": "Click on first button",
+    "selector": "#main-button"
+  },
+  {
+    "type": "Wait",
+    "name": "Wait for action to complete",
+    "duration_seconds": 1
+  },
+  {
+    "type": "Screenshot",
+    "name": "Take screenshot of result",
+    "file_path": "screenshots/result.png"
+  },
+  {
+    "type": "Click",
+    "name": "Click on second button",
+    "selector": "#secondary-button"
+  },
+  {
+    "type": "Wait",
+    "name": "Wait for second action",
+    "duration_seconds": 1
+  },
+  {
+    "type": "Screenshot",
+    "name": "Take final screenshot",
+    "file_path": "screenshots/final_result.png"
+  }
+]

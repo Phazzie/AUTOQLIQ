@@ -10,6 +10,7 @@ import time # For timing execution
 from typing import List, Optional, Dict, Any
 import threading # For stop event checking
 from datetime import datetime # For timestamps in log
+from enum import Enum, auto
 
 # Core components
 from src.core.interfaces import IWebDriver, IAction, ICredentialRepository, IWorkflowRepository # Added IWorkflowRepository
@@ -25,6 +26,13 @@ from src.core.actions.template_action import TemplateAction # Added
 from src.core.actions.factory import ActionFactory
 
 logger = logging.getLogger(__name__)
+
+
+class ErrorHandlingStrategy(Enum):
+    """Enum for workflow error handling strategies."""
+    STOP_ON_ERROR = auto()  # Stop workflow execution on first error
+    CONTINUE_ON_ERROR = auto()  # Continue workflow execution on error
+    RETRY_ON_ERROR = auto()  # Retry action on error
 
 
 class WorkflowRunner:

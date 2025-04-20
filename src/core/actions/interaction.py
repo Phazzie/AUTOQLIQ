@@ -36,28 +36,20 @@ class ClickAction(ActionBase):
             raise ValidationError("Selector must be a non-empty string.", field_name="selector")
         return True
 
-    def execute(
-        self,
-        driver: IWebDriver,
-        credential_repo: Optional[ICredentialRepository] = None,
-        context: Optional[Dict[str, Any]] = None # Accept context
-    ) -> ActionResult:
+    def execute(self, driver: IWebDriver) -> ActionResult:
         """Execute the click action using the web driver."""
-        logger.info(f"Executing {self.action_type} action (Name: {self.name}) on selector: '{self.selector}'")
+        logger.info(f"Executing {self.action_type} '{self.name}' -> {self.selector}")
         try:
             self.validate()
-            driver.click_element(self.selector) # Raises WebDriverError on failure
-            msg = f"Successfully clicked element with selector: {self.selector}"
-            logger.debug(msg)
-            return ActionResult.success(msg)
+            driver.click(self.selector)
+            return ActionResult.success(f"Clicked element '{self.selector}'")
         except (ValidationError, WebDriverError) as e:
-            msg = f"Error clicking element '{self.selector}': {e}"
-            logger.error(msg)
-            return ActionResult.failure(msg)
+            logger.error(f"Click failed ({e})")
+            return ActionResult.failure(str(e))
         except Exception as e:
-            error = ActionError(f"Unexpected error clicking element '{self.selector}'", action_name=self.name, action_type=self.action_type, cause=e)
-            logger.error(str(error), exc_info=True)
-            return ActionResult.failure(str(error))
+            err = ActionError("Unexpected click error", action_name=self.name, action_type=self.action_type, cause=e)
+            logger.error(err, exc_info=True)
+            return ActionResult.failure(str(err))
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize the action to a dictionary."""

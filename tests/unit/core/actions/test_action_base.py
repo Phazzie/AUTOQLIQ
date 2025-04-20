@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import logging
+import pytest  # type: ignore
 
 from src.core.actions.base import ActionBase
 from src.core.interfaces import IWebDriver, ICredentialRepository
@@ -40,6 +41,37 @@ class ConcreteAction(ActionBase):
         if self.test_param is not None and not isinstance(self.test_param, str):
             raise ValidationError("test_param must be a string if provided", field_name="test_param")
         return True
+
+
+# Dummy subclass for testing
+class DummyAction(ActionBase):
+    action_type = "Dummy"
+
+    def __init__(self, name=None):
+        super().__init__(name or self.action_type)
+
+    def execute(self, driver):
+        return ActionResult.success("ok")
+
+    def to_dict(self):
+        return {"type": self.action_type, "name": self.name}
+
+
+def test_validate_success():
+    action = DummyAction("TestAction")
+    assert action.validate() is True
+
+
+def test_init_empty_name_raises():
+    with pytest.raises(ValidationError):
+        DummyAction("")
+
+
+def test_execute_returns_success():
+    action = DummyAction()
+    result = action.execute(None)
+    assert isinstance(result, ActionResult)
+    assert result.is_success()
 
 
 class TestActionBase(unittest.TestCase):

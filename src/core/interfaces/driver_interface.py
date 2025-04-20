@@ -1,66 +1,95 @@
 """Defines the interface for WebDriver interactions."""
 
 import logging
-from typing import Protocol, Any, List, Tuple
+from typing import Any, List, Tuple
+from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)
 
-class IWebDriver(Protocol):
-    """Interface defining methods for browser automation drivers."""
+class IWebDriver(ABC):
+    """Interface for web driver operations required by actions."""
 
+    @abstractmethod
     def get(self, url: str) -> None:
-        """Navigate to a given URL."""
-        ...
+        """Navigate to the specified URL."""
+        pass
 
-    def find_element(self, by: str, value: str) -> Any:
-        """Find a single element using the specified locator strategy.
+    @abstractmethod
+    def find_element(self, selector: str) -> Any:
+        """Locate an element using the provided selector."""
+        pass
 
-        Args:
-            by: Locator strategy (e.g., 'id', 'xpath', 'css selector').
-            value: The value of the locator.
+    @abstractmethod
+    def click_element(self, selector: str) -> None:
+        """Click on an element identified by the CSS selector."""
+        pass
 
-        Returns:
-            A representation of the web element.
+    @abstractmethod
+    def click(self, selector: str) -> None:
+        """Alias for click_element for backward compatibility."""
+        pass
 
-        Raises:
-            NoSuchElementException: If the element cannot be found.
-        """
-        ...
+    @abstractmethod
+    def type_text(self, selector: str, text: str) -> None:
+        """Type text into an element identified by the CSS selector."""
+        pass
 
-    def find_elements(self, by: str, value: str) -> List[Any]:
-        """Find multiple elements using the specified locator strategy."""
-        ...
+    @abstractmethod
+    def get_attribute(self, selector: str, attribute: str) -> Any:
+        """Retrieve the specified attribute from the element identified by the CSS selector."""
+        pass
 
-    def click(self, element: Any) -> None:
-        """Click on a given element."""
-        ...
-
-    def type_text(self, element: Any, text: str, clear_first: bool = True) -> None:
-        """Type text into a given element, optionally clearing it first."""
-        ...
-
-    def get_attribute(self, element: Any, attribute_name: str) -> str | None:
-        """Get the value of an attribute from a given element."""
-        ...
-
-    def execute_script(self, script: str, *args) -> Any:
-        """Execute JavaScript in the context of the current frame or window."""
-        ...
-
-    def switch_to_frame(self, frame_reference: Any) -> None:
-        """Switch focus to a frame (by index, name, id, or element)."""
-        ...
-
-    def switch_to_default_content(self) -> None:
-        """Switch focus back to the default content from a frame."""
-        ...
-
-    def close(self) -> None:
-        """Close the current window."""
-        ...
-
+    @abstractmethod
     def quit(self) -> None:
-        """Quit the driver and close all associated windows."""
-        ...
+        """Quit the WebDriver and close all associated windows."""
+        pass
 
-    # Add other necessary methods like wait_for_element, get_current_url, etc.
+    @abstractmethod
+    def take_screenshot(self, file_path: str) -> None:
+        """Take a screenshot and save it to the specified file path."""
+        pass
+
+    @abstractmethod
+    def is_element_present(self, selector: str) -> bool:
+        """Check if an element is present on the page without raising an error."""
+        pass
+
+    @abstractmethod
+    def get_current_url(self) -> str:
+        """Get the current URL of the browser."""
+        pass
+
+    @abstractmethod
+    def execute_script(self, script: str, *args: Any) -> Any:
+        """Executes JavaScript in the current window/frame."""
+        pass
+
+    @abstractmethod
+    def wait_for_element(self, selector: str, timeout: int = 10) -> Any:
+        """Wait explicitly for an element to be present on the page."""
+        pass
+
+    @abstractmethod
+    def switch_to_frame(self, frame_reference: Any) -> None:
+        """Switch focus to a frame or iframe."""
+        pass
+
+    @abstractmethod
+    def switch_to_default_content(self) -> None:
+        """Switch back to the default content (main document)."""
+        pass
+
+    @abstractmethod
+    def accept_alert(self) -> None:
+        """Accept an alert, confirm, or prompt dialog."""
+        pass
+
+    @abstractmethod
+    def dismiss_alert(self) -> None:
+        """Dismiss an alert or confirm dialog."""
+        pass
+
+    @abstractmethod
+    def get_alert_text(self) -> str:
+        """Get the text content of an alert, confirm, or prompt dialog."""
+        pass

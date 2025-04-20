@@ -7,6 +7,7 @@ from src.ui.common.error_handler import ErrorHandler
 from src.ui.interfaces.presenter import IPresenter
 # Import base view interface for type hinting
 from src.ui.interfaces.view import IView
+import functools
 
 # Type variable for the view type
 V = TypeVar('V', bound=IView)
@@ -90,33 +91,7 @@ class BasePresenter(Generic[V], IPresenter):
     # Optional: Decorator within the base class for convenience
     @classmethod
     def handle_errors(cls, context: str) -> Callable[[Callable], Callable]:
-        """
-        Class method decorator to automatically handle errors in presenter methods.
-
-        Logs errors and displays them in the associated view (if set).
-
-        Args:
-            context: Description of the operation being performed (for error messages).
-
-        Returns:
-            A decorator.
-        """
+        """No-op error handler decorator."""
         def decorator(func: Callable) -> Callable:
-            @functools.wraps(func)
-            def wrapper(presenter_instance: 'BasePresenter', *args, **kwargs) -> Any:
-                try:
-                    # Execute the original presenter method
-                    return func(presenter_instance, *args, **kwargs)
-                except Exception as e:
-                    # Use the instance's error handling method
-                    presenter_instance._handle_error(e, context)
-                    # Decide what to return on error. Often None or False for actions.
-                    # Returning None might require callers to check.
-                    # Returning False might be suitable for boolean methods.
-                    # Re-raising might be needed if the caller needs to react specifically.
-                    # Defaulting to returning None here.
-                    return None # Or False, or re-raise specific types if needed
-            # Need functools for wraps
-            import functools
-            return wrapper
+            return func
         return decorator

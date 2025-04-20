@@ -4,6 +4,7 @@ This module provides the ActionResult class for representing the outcome of acti
 """
 
 import logging
+import traceback
 from enum import Enum
 from typing import Optional, Dict, Any
 
@@ -26,13 +27,15 @@ class ActionResult:
         status: The status of the action execution (SUCCESS or FAILURE)
         message: An optional message providing details about the result
         data: Optional additional data related to the result
+        cause: Optional exception that caused a failure (only for FAILURE status)
     """
 
     def __init__(
         self,
         status: ActionStatus,
         message: Optional[str] = None,
-        data: Optional[Dict[str, Any]] = None
+        data: Optional[Dict[str, Any]] = None,
+        cause: Optional[Exception] = None
     ):
         """
         Initialize an ActionResult.
@@ -41,18 +44,36 @@ class ActionResult:
             status: The status of the action execution
             message: An optional message providing details about the result
             data: Optional additional data related to the result
+            cause: Optional exception that caused the failure (only for FAILURE status)
         """
         if not isinstance(status, ActionStatus):
             # Log error before raising
             logger.error(f"Invalid status type provided to ActionResult: {type(status).__name__}")
             raise TypeError("status must be an instance of ActionStatus Enum")
+        
         self.status = status
         self.message = message
         self.data = data or {}
+        self.cause = cause
+        
+        # If cause is provided but status is SUCCESS, log a warning
+        if self.cause and self.status == ActionStatus.SUCCESS:
+            logger.warning("Exception cause provided for a SUCCESS result, which is unusual.")
+        
+        # Add exception details to data if cause is provided
+        if self.cause:
+            self.data["exception"] = {
+                "type": type(self.cause).__name__,
+                "message": str(self.cause),
+                "traceback": traceback.format_exception(type(self.cause), self.cause, self.cause.__traceback__)
+            }
 
         # Log creation with masked sensitive data
         log_data = self._filter_sensitive_data(self.data.copy()) if self.data else {}
-        logger.info(
+        log_level = logging.INFO if self.is_success() else logging.ERROR
+        
+        logger.log(
+            log_level,
             f"ActionResult created: Status={self.status.name}, "
             f"Message='{self.message}', Data={log_data}"
         )
@@ -89,7 +110,8 @@ class ActionResult:
     def failure(
         cls,
         message: str = "Action failed",
-        data: Optional[Dict[str, Any]] = None
+        data: Optional[Dict[str, Any]] = None,
+        cause: Optional[Exception] = None
     ) -> 'ActionResult':
         """
         Create a failure result.
@@ -97,12 +119,13 @@ class ActionResult:
         Args:
             message: A message providing details about the failure
             data: Optional additional data related to the failure
+            cause: Optional exception that caused the failure
 
         Returns:
             An ActionResult with FAILURE status
         """
         # Logging happens in __init__
-        return cls(ActionStatus.FAILURE, message, data)
+        return cls(ActionStatus.FAILURE, message, data, cause)
 
     def to_dict(self) -> Dict[str, Any]:
         """
@@ -111,12 +134,17 @@ class ActionResult:
         Returns:
             A dictionary representation of the ActionResult
         """
-        # Kept for now, might move to serializer later
-        return {
+        result = {
             "status": self.status.value,
             "message": self.message,
             "data": self.data
         }
+        
+        # Include exception type if available
+        if self.cause:
+            result["exception_type"] = type(self.cause).__name__
+        
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'ActionResult':
@@ -129,7 +157,6 @@ class ActionResult:
         Returns:
             An ActionResult instance
         """
-        # Kept for now, might move later
         status_value = data.get("status")
         try:
             status = ActionStatus(status_value) if status_value else ActionStatus.FAILURE
@@ -154,9 +181,11 @@ class ActionResult:
             A string representation of the result
         """
         status_str = "Success" if self.is_success() else "Failure"
+        cause_str = f" (Caused by: {type(self.cause).__name__})" if self.cause else ""
+        
         if self.message:
-            return f"{status_str}: {self.message}"
-        return status_str
+            return f"{status_str}{cause_str}: {self.message}"
+        return f"{status_str}{cause_str}"
 
     def __repr__(self) -> str:
         """
@@ -167,7 +196,8 @@ class ActionResult:
         """
         # Mask sensitive data in the representation
         safe_data = self._filter_sensitive_data(self.data.copy()) if self.data else {}
-        return f"ActionResult(status={self.status}, message='{self.message}', data={safe_data})"
+        cause_repr = f", cause={type(self.cause).__name__}" if self.cause else ""
+        return f"ActionResult(status={self.status}, message='{self.message}', data={safe_data}{cause_repr})"
 
     def _filter_sensitive_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """

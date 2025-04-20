@@ -17,6 +17,7 @@ from tests.unit.core.test_actions import MockTestAction # Import from actions te
 
 
 # Use :memory: for a clean database on each run, no file cleanup needed
+# This ensures tests are isolated and don't affect the actual database
 IN_MEMORY_DB_PATH = ":memory:"
 
 class TestDatabaseRepositoryIntegration(unittest.TestCase):
@@ -28,7 +29,8 @@ class TestDatabaseRepositoryIntegration(unittest.TestCase):
         # The repositories will create tables on init if they don't exist in the :memory: db
         self.cred_repo = DatabaseCredentialRepository(db_path=IN_MEMORY_DB_PATH)
         self.wf_repo = DatabaseWorkflowRepository(db_path=IN_MEMORY_DB_PATH)
-        # Ensure both repos point to the *same* in-memory db for tests involving both tables if needed
+        # Both repos point to the *same* in-memory db for tests involving both tables
+        # This is important for testing relationships between credentials and workflows
 
     def tearDown(self):
         """Database is automatically discarded when connection closes."""

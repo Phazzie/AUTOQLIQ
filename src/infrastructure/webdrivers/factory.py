@@ -31,7 +31,8 @@ class WebDriverFactory:
         implicit_wait_seconds: int = 0,
         selenium_options: Optional[Any] = None, # e.g., ChromeOptions instance
         playwright_options: Optional[Dict[str, Any]] = None, # Options for Playwright launch
-        webdriver_path: Optional[str] = None # Optional path to the webdriver executable
+        webdriver_path: Optional[str] = None, # Optional path to the webdriver executable
+        headless: bool = False # Whether to run in headless mode
     ) -> IWebDriver:
         """
         Creates an IWebDriver implementation instance.
@@ -44,6 +45,7 @@ class WebDriverFactory:
             playwright_options (Optional[Dict[str, Any]]): Dictionary of options for Playwright launch.
             webdriver_path (Optional[str]): Explicit path to the WebDriver executable (e.g., chromedriver).
                                             If None, Selenium Manager or system PATH is used.
+            headless (bool): Whether to run the browser in headless mode (no GUI). Defaults to False.
 
         Returns:
             IWebDriver: An instance conforming to the IWebDriver interface.
@@ -52,7 +54,8 @@ class WebDriverFactory:
             ConfigError: If the driver_type or browser_type is unsupported.
             WebDriverError: If the underlying driver fails to initialize.
         """
-        logger.info(f"Requesting {driver_type} driver for {browser_type.value} with implicit wait {implicit_wait_seconds}s")
+        headless_str = "headless mode" if headless else "normal mode"
+        logger.info(f"Requesting {driver_type} driver for {browser_type.value} with implicit wait {implicit_wait_seconds}s in {headless_str}")
 
         try:
             if driver_type.lower() == "selenium":
@@ -61,13 +64,20 @@ class WebDriverFactory:
                     browser_type=browser_type,
                     implicit_wait_seconds=implicit_wait_seconds,
                     selenium_options=selenium_options,
-                    webdriver_path=webdriver_path
+                    webdriver_path=webdriver_path,
+                    headless=headless
                 )
             elif driver_type.lower() == "playwright":
                 # Ensure Playwright is installed before attempting to use
                 try:
                     from src.infrastructure.webdrivers.playwright_driver import PlaywrightDriver
                     # PlaywrightDriver handles its own browser launching internally
+                    # Ensure headless is included in launch options if specified
+                    if playwright_options is None:
+                        playwright_options = {}
+                    if headless and 'headless' not in playwright_options:
+                        playwright_options['headless'] = True
+
                     return PlaywrightDriver(
                         browser_type=browser_type,
                         launch_options=playwright_options,

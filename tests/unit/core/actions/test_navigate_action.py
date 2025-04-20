@@ -8,6 +8,42 @@ from src.core.actions.navigation import NavigateAction, URL_PATTERN
 from src.core.interfaces import IWebDriver, ICredentialRepository
 from src.core.action_result import ActionResult, ActionStatus
 from src.core.exceptions import ValidationError, WebDriverError, ActionError
+import pytest
+from src.core.actions.navigation import NavigateAction
+from src.core.exceptions import ValidationError, WebDriverError
+from src.core.action_result import ActionResult
+
+class DummyDriver:
+    def __init__(self):
+        self.urls = []
+    def get(self, url: str):
+        self.urls.append(url)
+
+class ErrorDriver:
+    def get(self, url: str):
+        raise WebDriverError("driver failure", driver_type="test")
+
+
+def test_init_empty_url_raises_validation_error():
+    with pytest.raises(ValidationError):
+        NavigateAction("", name="BadNav")
+
+
+def test_execute_success_calls_driver_and_returns_success():
+    driver = DummyDriver()
+    action = NavigateAction("http://example.com", name="TestNav")
+    result = action.execute(driver)
+    assert isinstance(result, ActionResult)
+    assert result.is_success()
+    assert driver.urls == ["http://example.com"]
+
+
+def test_execute_driver_error_returns_failure():
+    action = NavigateAction("http://example.com", name="TestNav")
+    driver = ErrorDriver()
+    result = action.execute(driver)
+    assert not result.is_success()
+    assert "driver failure" in result.message
 
 
 class TestNavigateAction(unittest.TestCase):

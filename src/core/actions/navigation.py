@@ -21,43 +21,38 @@ class NavigateAction(ActionBase):
         """Initialize a NavigateAction."""
         super().__init__(name or self.action_type, **kwargs)
         if not isinstance(url, str) or not url:
-            raise ValidationError("URL must be a non-empty string.", field_name="url")
+            raise ValidationError("URL must be a non-empty string.", field_name="url", action_name=self.name, action_type=self.action_type)
         if not URL_PATTERN.match(url):
-             logger.warning(f"URL '{url}' may not be valid for NavigateAction '{self.name}'.")
+             logger.warning(f"[{self.action_type} '{self.name}'] URL '{url}' may not be valid.")
         self.url = url
-        logger.debug(f"NavigateAction '{self.name}' initialized for URL: '{self.url}'")
+        logger.debug(f"[{self.action_type} '{self.name}'] Initialized for URL: '{self.url}'")
 
     def validate(self) -> bool:
         """Validate the URL."""
         super().validate()
+        logger.debug(f"[{self.action_type} '{self.name}'] Validating URL: '{self.url}'")
         if not isinstance(self.url, str) or not self.url:
-            raise ValidationError("URL must be a non-empty string.", field_name="url")
+            raise ValidationError("URL must be a non-empty string.", field_name="url", action_name=self.name, action_type=self.action_type)
         if not URL_PATTERN.match(self.url):
-             logger.warning(f"URL '{self.url}' may not be valid during validation.")
+             logger.warning(f"[{self.action_type} '{self.name}'] URL '{self.url}' may not be valid during validation.")
         return True
 
-    def execute(
-        self,
-        driver: IWebDriver,
-        credential_repo: Optional[ICredentialRepository] = None,
-        context: Optional[Dict[str, Any]] = None # Accept context
-    ) -> ActionResult:
+    def execute(self, driver: IWebDriver, credential_repo: Optional[ICredentialRepository] = None, context: Optional[Dict[str, Any]] = None) -> ActionResult:
         """Execute the navigation action."""
-        logger.info(f"Executing {self.action_type} action (Name: {self.name}) to URL: '{self.url}'")
+        logger.info(f"[{self.action_type} '{self.name}'] Executing -> {self.url}")
         try:
             self.validate()
-            driver.get(self.url) # Raises WebDriverError on failure
-            msg = f"Successfully navigated to URL: {self.url}"
-            logger.debug(msg)
-            return ActionResult.success(msg)
+            driver.get(self.url)
+            logger.info(f"[{self.action_type} '{self.name}'] Successfully navigated to {self.url}")
+            return ActionResult.success(f"Navigated to {self.url}")
         except (ValidationError, WebDriverError) as e:
-            msg = f"Error navigating to '{self.url}': {e}"
+            msg = f"[{self.action_type} '{self.name}'] Navigation failed: {e}"
             logger.error(msg)
             return ActionResult.failure(msg)
         except Exception as e:
-            error = ActionError(f"Unexpected error navigating to '{self.url}'", action_name=self.name, action_type=self.action_type, cause=e)
-            logger.error(str(error), exc_info=True)
-            return ActionResult.failure(str(error))
+            err_msg = f"[{self.action_type} '{self.name}'] Unexpected error during navigation to {self.url}: {e}"
+            logger.error(err_msg, exc_info=True)
+            return ActionResult.failure(err_msg)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize the action."""

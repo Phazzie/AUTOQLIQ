@@ -50,8 +50,25 @@ class LoopAction(ActionBase):
                  expected_value: Optional[str] = None,
                  script: Optional[str] = None,
                  loop_actions: Optional[List[IAction]] = None,
+                 max_iterations: int = 1000,  # Maximum iterations for while loops
                  **kwargs):
-        """Initialize a LoopAction."""
+        """
+        Initialize a LoopAction.
+
+        Args:
+            name: Descriptive name for the action. Defaults to "Loop".
+            loop_type: Type of loop - "count", "for_each", or "while".
+            count: Number of iterations for "count" loop type.
+            list_variable_name: Context variable name containing list for "for_each" loop type.
+            condition_type: Condition type for "while" loop (same as ConditionalAction).
+            selector: CSS selector for element conditions in "while" loop.
+            variable_name: Context variable name for variable checks in "while" loop.
+            expected_value: Value to compare against for variable checks in "while" loop.
+            script: JavaScript code for JS conditions in "while" loop.
+            loop_actions: List of actions to execute in each iteration.
+            max_iterations: Maximum number of iterations for "while" loops (safety limit).
+            **kwargs: Additional parameters passed to parent class.
+        """
         super().__init__(name or self.action_type, **kwargs)
         if not isinstance(loop_type, str) or loop_type not in self.SUPPORTED_TYPES:
              raise ValidationError(f"loop_type must be one of {self.SUPPORTED_TYPES}.", field_name="loop_type")
@@ -63,6 +80,7 @@ class LoopAction(ActionBase):
         self.variable_name = variable_name
         self.expected_value = expected_value
         self.script = script
+        self.max_iterations = max_iterations
 
         if self.loop_type == "count":
              if count is None: raise ValidationError("'count' required.", field_name="count")
@@ -129,7 +147,17 @@ class LoopAction(ActionBase):
         credential_repo: Optional[ICredentialRepository] = None,
         context: Optional[Dict[str, Any]] = None
     ) -> ActionResult:
-        """Execute the nested actions repeatedly based on the loop type."""
+        """
+        Execute the nested actions repeatedly based on the loop type.
+
+        Args:
+            driver: WebDriver instance to use for execution.
+            credential_repo: Repository for credential access (passed to nested actions).
+            context: Execution context dictionary (will be copied for each iteration).
+
+        Returns:
+            ActionResult with success/failure status and message.
+        """
         # This action executes its children. Use local runner helper.
         logger.info(f"Executing {self.action_type} action (Name: {self.name}). Type: {self.loop_type}")
         try:
@@ -141,11 +169,11 @@ class LoopAction(ActionBase):
                  return ActionResult.success("Loop completed (no actions).")
 
             iterations_executed = 0
-            max_while_iterations = 1000 # Safety break
+            max_while_iterations = self.max_iterations # Use the configurable parameter
 
             # --- Use local runner helper for nested execution ---
-            from src.core.workflow.runner import WorkflowRunner # Local import
-            temp_runner = WorkflowRunner(driver, credential_repo, None, None) # No repo/stop needed
+            from src.core.workflow.workflow_runner import WorkflowRunner
+            temp_runner = WorkflowRunner(driver)
 
             if self.loop_type == "count":
                 iterations_total = self.count or 0
@@ -154,7 +182,7 @@ class LoopAction(ActionBase):
                     logger.info(f"{iter_log_prefix}Starting.")
                     iter_context = context.copy(); iter_context.update({'loop_index': i, 'loop_iteration': iteration_num, 'loop_total': iterations_total})
                     # Execute block using helper - raises ActionError on failure
-                    temp_runner._execute_actions(self.loop_actions, iter_context, workflow_name=self.name, log_prefix=iter_log_prefix)
+                    temp_runner._execute_actions(self.loop_actions, iter_context, credential_repo=credential_repo, workflow_name=self.name, log_prefix=iter_log_prefix)
                     iterations_executed = iteration_num
             elif self.loop_type == "for_each":
                  if not self.list_variable_name: raise ActionError("list_variable_name missing", self.name)
@@ -167,7 +195,7 @@ class LoopAction(ActionBase):
                       iteration_num = i + 1; iter_log_prefix = f"Loop '{self.name}' Item {iteration_num}: "
                       logger.info(f"{iter_log_prefix}Starting.")
                       iter_context = context.copy(); iter_context.update({'loop_index': i, 'loop_iteration': iteration_num, 'loop_total': iterations_total, 'loop_item': item})
-                      temp_runner._execute_actions(self.loop_actions, iter_context, workflow_name=self.name, log_prefix=iter_log_prefix) # Raises ActionError
+                      temp_runner._execute_actions(self.loop_actions, iter_context, credential_repo=credential_repo, workflow_name=self.name, log_prefix=iter_log_prefix) # Raises ActionError
                       iterations_executed = iteration_num
             elif self.loop_type == "while":
                  logger.info(f"Loop '{self.name}' starting 'while' loop.")
@@ -179,7 +207,7 @@ class LoopAction(ActionBase):
                       if not condition_met: logger.info(f"{iter_log_prefix}Condition false. Exiting loop."); break
                       logger.info(f"{iter_log_prefix}Condition true. Starting iteration.")
                       iter_context = context.copy(); iter_context.update({'loop_index': i, 'loop_iteration': iteration_num})
-                      temp_runner._execute_actions(self.loop_actions, iter_context, workflow_name=self.name, log_prefix=iter_log_prefix) # Raises ActionError
+                      temp_runner._execute_actions(self.loop_actions, iter_context, credential_repo=credential_repo, workflow_name=self.name, log_prefix=iter_log_prefix) # Raises ActionError
                       iterations_executed = iteration_num
                       i += 1
                  else: raise ActionError(f"While loop exceeded max iterations ({max_while_iterations}).", self.name)

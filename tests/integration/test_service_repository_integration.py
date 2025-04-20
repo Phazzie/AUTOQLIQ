@@ -13,12 +13,29 @@ from src.infrastructure.webdrivers.base import BrowserType
 from src.core.exceptions import CredentialError, WorkflowError, RepositoryError, ValidationError, ActionError
 from src.core.action_result import ActionResult
 
-# Mock Action
+# Mock Action for testing
 class MockServiceIntAction(IAction):
-    action_type = "MockSI"; name = "MockSIAction"
-    def execute(self, d, cr=None, ctx=None): return ActionResult.success("OK")
-    def to_dict(self): return {"type":self.action_type, "name":self.name}
-    def validate(self): return True
+    """Mock action implementation for testing service-repository interactions."""
+    action_type = "MockSI"
+
+    def __init__(self, name="MockSIAction"):
+        self.name = name
+
+    def execute(self, driver, credential_repo=None, context=None):
+        """Mock execution that always succeeds."""
+        return ActionResult.success("OK")
+
+    def to_dict(self):
+        """Serialize to dictionary."""
+        return {"type": self.action_type, "name": self.name}
+
+    def validate(self):
+        """Mock validation that always passes."""
+        return True
+
+    def get_nested_actions(self):
+        """No nested actions."""
+        return []
 
 
 # Mock werkzeug hashing functions for CredentialService tests

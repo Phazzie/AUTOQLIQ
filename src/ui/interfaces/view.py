@@ -5,7 +5,7 @@ defining the contract between presenters and views.
 """
 
 import abc
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 # Assuming IAction is defined in core interfaces
 from src.core.interfaces import IAction
@@ -38,6 +38,30 @@ class IView(abc.ABC):
     def clear(self) -> None:
          """Clear or reset the view's state."""
          pass
+
+    @abc.abstractmethod
+    def show_loading(self, is_loading: bool) -> None:
+        """Show or hide a loading indicator."""
+        pass
+
+
+class IMainView(IView):
+    """Interface for the main application view."""
+
+    @abc.abstractmethod
+    def set_title(self, title: str) -> None:
+        """Set the window title."""
+        pass
+
+    @abc.abstractmethod
+    def create_menu(self) -> None:
+        """Create the application menu."""
+        pass
+
+    @abc.abstractmethod
+    def bind_menu_handlers(self, handlers: Dict[str, Callable]) -> None:
+        """Bind menu item handlers."""
+        pass
 
 
 class IWorkflowEditorView(IView):
@@ -72,6 +96,11 @@ class IWorkflowEditorView(IView):
     def prompt_for_workflow_name(self, title: str, prompt: str) -> Optional[str]:
          """Prompt the user to enter a name for a new workflow."""
          pass
+
+    @abc.abstractmethod
+    def bind_handlers(self, handlers: Dict[str, Callable]) -> None:
+        """Bind event handlers for UI elements."""
+        pass
 
 
 class IWorkflowRunnerView(IView):
@@ -112,18 +141,52 @@ class IWorkflowRunnerView(IView):
         """Update the UI elements based on whether a workflow is running (e.g., disable Run, enable Stop)."""
         pass
 
+    @abc.abstractmethod
+    def display_execution_status(self, status: Dict[str, Any]) -> None:
+        """Display the current execution status."""
+        pass
+
+    @abc.abstractmethod
+    def display_execution_results(self, results: List[Dict[str, Any]]) -> None:
+        """Display the execution results."""
+        pass
+
+    @abc.abstractmethod
+    def bind_handlers(self, handlers: Dict[str, Callable]) -> None:
+        """Bind event handlers for UI elements."""
+        pass
+
     # Optional progress indication methods
-    # @abc.abstractmethod
-    # def start_progress(self) -> None:
-    #     """Start a progress indicator (e.g., indeterminate progress bar)."""
-    #     pass
+    @abc.abstractmethod
+    def start_progress(self) -> None:
+        """Start a progress indicator (e.g., indeterminate progress bar)."""
+        pass
 
-    # @abc.abstractmethod
-    # def stop_progress(self) -> None:
-    #     """Stop the progress indicator."""
-    #     pass
+    @abc.abstractmethod
+    def stop_progress(self) -> None:
+        """Stop the progress indicator."""
+        pass
 
-    # @abc.abstractmethod
-    # def set_progress(self, value: float) -> None:
-    #     """Set the value of a determinate progress indicator (0-100)."""
-    #     pass
+    @abc.abstractmethod
+    def set_progress(self, value: float) -> None:
+        """Set the value of a determinate progress indicator (0-100)."""
+        pass
+
+
+class ISettingsView(IView):
+    """Interface for the settings view."""
+
+    @abc.abstractmethod
+    def display_settings(self, settings: Dict[str, Any]) -> None:
+        """Display the current settings."""
+        pass
+
+    @abc.abstractmethod
+    def bind_handlers(self, handlers: Dict[str, Callable]) -> None:
+        """Bind event handlers for UI elements."""
+        pass
+
+    @abc.abstractmethod
+    def get_settings(self) -> Dict[str, Any]:
+        """Get the current settings from the UI."""
+        pass

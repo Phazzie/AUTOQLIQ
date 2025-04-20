@@ -1,7 +1,7 @@
 """Selenium WebDriver implementation for AutoQliq."""
 import logging
 import os
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, List
 
 # Selenium imports
 from selenium import webdriver
@@ -38,10 +38,20 @@ class SeleniumWebDriver(IWebDriver):
                  browser_type: BrowserType = BrowserType.CHROME,
                  implicit_wait_seconds: int = 0,
                  selenium_options: Optional[Any] = None,
-                 webdriver_path: Optional[str] = None):
-        """Initialize SeleniumWebDriver and the underlying Selenium driver."""
+                 webdriver_path: Optional[str] = None,
+                 headless: bool = False):
+        """Initialize SeleniumWebDriver and the underlying Selenium driver.
+
+        Args:
+            browser_type: The type of browser to use (CHROME, FIREFOX, EDGE, SAFARI).
+            implicit_wait_seconds: The number of seconds to wait when finding elements.
+            selenium_options: Browser-specific options object (ChromeOptions, FirefoxOptions, etc.).
+            webdriver_path: Path to the WebDriver executable (chromedriver, geckodriver, etc.).
+            headless: Whether to run the browser in headless mode (no GUI).
+        """
         self.browser_type = browser_type
         self.implicit_wait_seconds = implicit_wait_seconds
+        self.headless = headless
         self.driver: Optional[RemoteWebDriver] = None
         logger.info(f"Initializing SeleniumWebDriver for: {self.browser_type.value}")
 
@@ -76,35 +86,102 @@ class SeleniumWebDriver(IWebDriver):
              raise WebDriverError(err_msg, driver_type=self.browser_type.value, cause=e) from e
 
     def _resolve_options(self, options_param: Optional[Any]) -> Optional[Any]:
-        """Returns the appropriate options object or None."""
+        """Returns the appropriate options object with default configurations.
+
+        If self.headless is True, configures the browser to run in headless mode.
+        """
+        options = None
+
         if options_param:
              expected_type = { BrowserType.CHROME: ChromeOptions, BrowserType.FIREFOX: FirefoxOptions,
                                BrowserType.EDGE: EdgeOptions, BrowserType.SAFARI: SafariOptions }.get(self.browser_type)
              if expected_type and not isinstance(options_param, expected_type):
                   logger.warning(f"Provided options type ({type(options_param).__name__}) might not match browser ({self.browser_type.value}).")
-             return options_param
+             options = options_param
         else:
              logger.debug(f"No specific Selenium options provided for {self.browser_type.value}. Using defaults.")
-             if self.browser_type == BrowserType.CHROME: return ChromeOptions()
-             if self.browser_type == BrowserType.FIREFOX: return FirefoxOptions()
-             if self.browser_type == BrowserType.EDGE: return EdgeOptions()
-             if self.browser_type == BrowserType.SAFARI: return SafariOptions()
-             return None
+
+             # Create browser-specific options with sensible defaults
+             if self.browser_type == BrowserType.CHROME:
+                 options = ChromeOptions()
+                 # Add common Chrome options
+                 options.add_argument("--no-sandbox")
+                 options.add_argument("--disable-dev-shm-usage")
+
+             elif self.browser_type == BrowserType.FIREFOX:
+                 options = FirefoxOptions()
+                 # Add common Firefox options
+                 options.set_preference("browser.download.folderList", 2)
+                 options.set_preference("browser.download.manager.showWhenStarting", False)
+                 options.set_preference("browser.helperApps.neverAsk.saveToDisk",
+                                       "application/pdf,application/x-pdf,application/octet-stream")
+
+             elif self.browser_type == BrowserType.EDGE:
+                 options = EdgeOptions()
+                 # Add common Edge options
+                 options.add_argument("--no-sandbox")
+
+             elif self.browser_type == BrowserType.SAFARI:
+                 options = SafariOptions()
+
+        # Apply headless mode if requested (for browsers that support it)
+        if options and self.headless:
+            if self.browser_type in [BrowserType.CHROME, BrowserType.EDGE]:
+                logger.info(f"Configuring {self.browser_type.value} for headless mode")
+                options.add_argument("--headless=new")
+            elif self.browser_type == BrowserType.FIREFOX:
+                logger.info("Configuring Firefox for headless mode")
+                options.add_argument("-headless")
+            else:
+                logger.warning(f"Headless mode not supported for {self.browser_type.value}")
+
+        return options
 
     def _create_service(self, webdriver_path: Optional[str]) -> Optional[Any]:
          """Creates a Selenium Service object if a path is provided."""
          from selenium.webdriver.chrome.service import Service as ChromeService
          from selenium.webdriver.firefox.service import Service as FirefoxService
          from selenium.webdriver.edge.service import Service as EdgeService
-         service_map = { BrowserType.CHROME: ChromeService, BrowserType.FIREFOX: FirefoxService, BrowserType.EDGE: EdgeService }
+
+         # Map browser types to their service classes
+         service_map = {
+             BrowserType.CHROME: ChromeService,
+             BrowserType.FIREFOX: FirefoxService,
+             BrowserType.EDGE: EdgeService
+         }
+
          service_class = service_map.get(self.browser_type)
+
+         # Safari doesn't use a service class
+         if self.browser_type == BrowserType.SAFARI:
+             if webdriver_path:
+                 logger.warning(f"webdriver_path '{webdriver_path}' ignored for Safari.")
+             return None
+
+         # Handle Firefox-specific geckodriver path
+         if self.browser_type == BrowserType.FIREFOX and service_class:
+             # Firefox uses geckodriver
+             if webdriver_path:
+                 if not os.path.exists(webdriver_path):
+                     raise ConfigError(f"Firefox geckodriver not found at: {webdriver_path}")
+                 logger.info(f"Using explicit geckodriver path for Firefox: {webdriver_path}")
+                 return service_class(executable_path=webdriver_path)
+             else:
+                 logger.debug("Using Selenium Manager or system PATH for geckodriver.")
+                 return service_class()
+
+         # Handle other browsers
          if service_class and webdriver_path:
-              if not os.path.exists(webdriver_path): raise ConfigError(f"WebDriver executable not found: {webdriver_path}")
+              if not os.path.exists(webdriver_path):
+                  raise ConfigError(f"WebDriver executable not found: {webdriver_path}")
               logger.info(f"Using explicit webdriver path: {webdriver_path}")
               return service_class(executable_path=webdriver_path)
-         elif webdriver_path: logger.warning(f"webdriver_path '{webdriver_path}' ignored for {self.browser_type.value}.")
-         else: logger.debug(f"Using Selenium Manager or system PATH for {self.browser_type.value}.")
-         return None
+         elif service_class:
+              logger.debug(f"Using Selenium Manager or system PATH for {self.browser_type.value}.")
+              return service_class()
+         else:
+              logger.warning(f"No service class available for {self.browser_type.value}.")
+              return None
 
     def _ensure_driver(self) -> RemoteWebDriver:
         """Checks if the driver is initialized."""
@@ -217,6 +294,65 @@ class SeleniumWebDriver(IWebDriver):
     @handle_driver_exceptions("Failed to get alert text")
     def get_alert_text(self) -> str:
         driver = self._ensure_driver(); return driver.switch_to.alert.text
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to find elements with selector: {selector}")
+    def find_elements(self, selector: str) -> List[WebElement]:
+        """Find all elements matching the CSS selector."""
+        if not isinstance(selector, str) or not selector: raise ValidationError("Selector must be non-empty string.", field_name="selector")
+        driver = self._ensure_driver()
+        return driver.find_elements(By.CSS_SELECTOR, selector)
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to get page source")
+    def get_page_source(self) -> str:
+        """Get the source code of the current page."""
+        driver = self._ensure_driver()
+        return driver.page_source
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to get page title")
+    def get_title(self) -> str:
+        """Get the title of the current page."""
+        driver = self._ensure_driver()
+        return driver.title
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to set window size: width={width}, height={height}")
+    def set_window_size(self, width: int, height: int) -> None:
+        """Set the window size of the browser."""
+        if not isinstance(width, int) or width <= 0: raise ValidationError("Width must be a positive integer.", field_name="width")
+        if not isinstance(height, int) or height <= 0: raise ValidationError("Height must be a positive integer.", field_name="height")
+        driver = self._ensure_driver()
+        driver.set_window_size(width, height)
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to maximize window")
+    def maximize_window(self) -> None:
+        """Maximize the browser window."""
+        driver = self._ensure_driver()
+        driver.maximize_window()
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to refresh page")
+    def refresh(self) -> None:
+        """Refresh the current page."""
+        driver = self._ensure_driver()
+        driver.refresh()
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to navigate back")
+    def back(self) -> None:
+        """Navigate back to the previous page."""
+        driver = self._ensure_driver()
+        driver.back()
+
+    @log_method_call(logger)
+    @handle_driver_exceptions("Failed to navigate forward")
+    def forward(self) -> None:
+        """Navigate forward to the next page."""
+        driver = self._ensure_driver()
+        driver.forward()
 
     def __enter__(self): return self
     def __exit__(self, exc_type, exc_val, exc_tb): self.quit()

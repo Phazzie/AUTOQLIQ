@@ -5,7 +5,7 @@ defining the contract between views and presenters.
 """
 
 import abc
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional, Dict, Callable
 
 # Assuming IAction is defined in core interfaces
 from src.core.interfaces import IAction
@@ -26,6 +26,30 @@ class IPresenter(abc.ABC):
     @abc.abstractmethod
     def initialize_view(self) -> None:
         """Initialize the associated view with necessary data."""
+        pass
+
+
+class IMainPresenter(IPresenter):
+    """Interface for the main application presenter."""
+
+    @abc.abstractmethod
+    def on_exit(self) -> None:
+        """Handle application exit."""
+        pass
+
+    @abc.abstractmethod
+    def on_about(self) -> None:
+        """Show the about dialog."""
+        pass
+
+    @abc.abstractmethod
+    def on_open_credential_manager(self) -> None:
+        """Open the credential manager dialog."""
+        pass
+
+    @abc.abstractmethod
+    def on_open_settings(self) -> None:
+        """Open the settings dialog."""
         pass
 
 
@@ -77,6 +101,21 @@ class IWorkflowEditorPresenter(IPresenter):
          """Get the data dictionary for the action at the specified index."""
          pass
 
+    @abc.abstractmethod
+    def on_workflow_selected(self, workflow_name: str) -> None:
+        """Handle workflow selection."""
+        pass
+
+    @abc.abstractmethod
+    def on_move_action_up(self, action_index: int) -> None:
+        """Handle move action up request."""
+        pass
+
+    @abc.abstractmethod
+    def on_move_action_down(self, action_index: int) -> None:
+        """Handle move action down request."""
+        pass
+
 
 class IWorkflowRunnerPresenter(IPresenter):
     """Interface for the Workflow Runner Presenter."""
@@ -99,4 +138,38 @@ class IWorkflowRunnerPresenter(IPresenter):
     @abc.abstractmethod
     def stop_workflow(self) -> None:
         """Stop the currently running workflow execution (if any)."""
+        pass
+
+    @abc.abstractmethod
+    def on_run_workflow(self) -> None:
+        """Handle run workflow request."""
+        pass
+
+    @abc.abstractmethod
+    def on_stop_workflow(self) -> None:
+        """Handle stop workflow request."""
+        pass
+
+    @abc.abstractmethod
+    def update_execution_status(self) -> None:
+        """Update the execution status display."""
+        pass
+
+
+class ISettingsPresenter(IPresenter):
+    """Interface for the settings presenter."""
+
+    @abc.abstractmethod
+    def load_settings(self) -> None:
+        """Load and display current settings."""
+        pass
+
+    @abc.abstractmethod
+    def on_save_settings(self) -> None:
+        """Handle save settings request."""
+        pass
+
+    @abc.abstractmethod
+    def on_reset_settings(self) -> None:
+        """Handle reset settings to defaults request."""
         pass

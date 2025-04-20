@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import logging
+import pytest
 
 from src.core.actions.click_action import ClickAction
 from src.core.actions.constants import SUPPORTED_LOCATORS
@@ -231,3 +232,155 @@ class TestClickAction(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+from src.core.actions.interaction import ClickAction
+from src.core.exceptions import ValidationError, WebDriverError
+from src.core.action_result import ActionResult
+
+class DummyDriver:
+    def __init__(self):
+        self.clicked = None
+    def click(self, selector: str):
+        self.clicked = selector
+
+class ErrorDriver:
+    def click(self, selector: str):
+        raise WebDriverError("click failed")
+
+
+def test_init_empty_selector_raises_validation_error():
+    with pytest.raises(ValidationError):
+        ClickAction("", name="BadClick")
+
+
+def test_execute_success_calls_driver_and_returns_success():
+    driver = DummyDriver()
+    action = ClickAction("button#submit", name="TestClick")
+    result = action.execute(driver)
+    assert isinstance(result, ActionResult)
+    assert result.is_success()
+    assert driver.clicked == "button#submit"
+
+
+def test_execute_driver_error_returns_failure():
+    driver = ErrorDriver()
+    action = ClickAction("button#submit", name="TestClick")
+    result = action.execute(driver)
+    assert not result.is_success()
+    assert "click failed" in result.message
+
+
+def test_to_dict_serializes_selector_and_metadata():
+    action = ClickAction("button", name="ClickTest")
+    data = action.to_dict()
+    assert data["selector"] == "button"
+    assert data["type"] == action.action_type
+    assert data["name"] == action.name
+
+import pytest
+from unittest.mock import Mock, call
+from src.core.actions.click_action import ClickAction
+from src.core.action_result import ActionResult, ActionStatus
+from src.core.exceptions import ValidationError, ActionError
+from src.core.interfaces import IWebDriver
+
+@pytest.fixture
+def driver_stub():
+    return Mock(spec=IWebDriver)
+
+def test_click_action_success(driver_stub):
+    selector = "#myButton"
+    action = ClickAction(name="Click Button", parameters={
+        "locator_type": "css selector",
+        "locator_value": selector
+    })
+    
+    # Mock the find_element to return a mock element with a click method
+    mock_element = Mock()
+    driver_stub.find_element.return_value = mock_element
+
+    result = action.execute(driver_stub)
+
+    driver_stub.find_element.assert_called_once_with(selector)
+    mock_element.click.assert_called_once()
+    assert result.status == ActionStatus.SUCCESS
+    assert result.message == f"Clicked element located by css selector: {selector}"
+
+def test_click_action_validation_fails_on_missing_locator_type():
+    with pytest.raises(ValidationError) as excinfo:
+        ClickAction(name="Click Button", parameters={
+            "locator_value": "#myButton"
+        })
+    assert "Missing or invalid 'locator_type' parameter" in str(excinfo.value)
+
+def test_click_action_validation_fails_on_unsupported_locator_type():
+    with pytest.raises(ValidationError) as excinfo:
+        ClickAction(name="Click Button", parameters={
+            "locator_type": "invalid_type",
+            "locator_value": "#myButton"
+        })
+    assert "Unsupported locator_type: 'invalid_type'" in str(excinfo.value)
+
+def test_click_action_validation_fails_on_missing_locator_value():
+    with pytest.raises(ValidationError) as excinfo:
+        ClickAction(name="Click Button", parameters={
+            "locator_type": "css selector"
+        })
+    assert "Missing or invalid 'locator_value' parameter" in str(excinfo.value)
+
+def test_click_action_execution_fails_if_element_not_found(driver_stub):
+    selector = "#nonExistentButton"
+    action = ClickAction(name="Click Button", parameters={
+        "locator_type": "css selector",
+        "locator_value": selector
+    })
+    
+    # Configure find_element to return None or raise an error if your driver does
+    driver_stub.find_element.return_value = None # Assuming find_element returns None if not found
+
+    result = action.execute(driver_stub)
+
+    driver_stub.find_element.assert_called_once_with(selector)
+    # Ensure click was NOT called on the mock element
+    # Note: This check depends on how your mock driver handles find_element returning None
+    # If find_element raises an exception, the test_click_action_execution_fails_on_webdriver_error would cover it.
+    # If it returns None, you might need a more sophisticated mock or check for the absence of calls.
+    # For this example, we'll assume returning None is the behavior and check the result.
+
+    assert result.status == ActionStatus.FAILURE
+    assert f"Element not found using css selector: {selector}" in result.message
+
+def test_click_action_execution_fails_on_webdriver_error(driver_stub):
+    selector = "#myButton"
+    action = ClickAction(name="Click Button", parameters={
+        "locator_type": "css selector",
+        "locator_value": selector
+    })
+    
+    driver_stub.find_element.side_effect = Exception("Simulated WebDriver error")
+
+    result = action.execute(driver_stub)
+
+    driver_stub.find_element.assert_called_once_with(selector)
+    assert result.status == ActionStatus.FAILURE
+    assert "Simulated WebDriver error" in result.message
+
+def test_click_action_to_dict():
+    action = ClickAction(name="Submit", parameters={
+        "locator_type": "xpath",
+        "locator_value": "//button[@type='submit']"
+    })
+    expected_dict = {
+        "type": "Click",
+        "name": "Submit",
+        "locator_type": "xpath",
+        "locator_value": "//button[@type='submit']"
+    }
+    assert action.to_dict() == expected_dict
+
+def test_click_action_default_name():
+    action = ClickAction(parameters={
+        "locator_type": "css selector",
+        "locator_value": ".some-class"
+    })
+    assert action.name == "Click"

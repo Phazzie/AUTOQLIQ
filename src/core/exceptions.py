@@ -198,12 +198,3 @@ class UIError(AutoQliqError):
              cause_msg = str(self.cause) if str(self.cause) else type(self.cause).__name__
              return f"{base_message} (Caused by: {type(self.cause).__name__}: {cause_msg})"
         return base_message
-
-
-# --- Deprecated / Compatibility ---
-class LoginFailedError(ActionError):
-    """Raised when login fails due to incorrect credentials or other issues.
-    Deprecated: Prefer raising ActionError or WorkflowError with appropriate context.
-    """
-    def __init__(self, message: str, cause: Optional[Exception] = None):
-        super().__init__(message, action_name="Login", cause=cause)

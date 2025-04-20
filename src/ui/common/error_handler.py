@@ -1,10 +1,12 @@
 """Error handler for UI components."""
 import logging
+import functools
+import inspect
 import tkinter as tk
 from tkinter import messagebox
 from typing import Optional, Callable, Dict, Any, List, Union
 
-from src.core.exceptions import AutoQliqError, UIError, WorkflowError, CredentialError, WebDriverError, ValidationError
+from src.core.exceptions import AutoQliqError, UIError, WorkflowError, CredentialError, WebDriverError, ValidationError, ConfigError, SerializationError
 
 
 class ErrorHandler:

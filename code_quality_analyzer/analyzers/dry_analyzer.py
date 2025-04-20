@@ -393,7 +393,8 @@ class DRYAnalyzer(BaseAnalyzer):
                 
                 for block in file_result.get("duplicate_code_blocks", []):
                     report.append(f"  {file_name}: Block with {block['occurrences']} occurrences")
-                    report.append(f"    First few lines: {block['code'].split('\\n')[0][:50]}...")
+                    code_line = block['code'].split('\n')[0][:50]
+                    report.append(f"    First few lines: {code_line}...")
                     
                     # Generate recommendation
                     recommendations = self._generate_recommendations(file_result)

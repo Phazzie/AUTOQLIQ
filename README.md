@@ -15,9 +15,15 @@ AutoQliq/
 ├── README.md                     # This file
 ├── credentials.json              # Example credential file (if using file_system repo)
 ├── workflows/                    # Example workflow directory (if using file_system repo)
-│   └── example_workflow.json     # Example workflow definition
+│   ├── example_workflow.json     # Example workflow definition
+│   └── default_workflow.json     # Default workflow for new users
 ├── templates/                    # Example template directory (if using file_system repo)
-│   └── example_template.json   # Example template definition
+│   └── example_template.json     # Example template definition
+├── docs/                         # Documentation directory
+│   ├── getting_started_tutorial.md    # Tutorial for new users
+│   ├── workflow_visualization.md      # Visual representation of workflow structure
+│   ├── editing_default_workflow.md    # Guide to customizing the default workflow
+│   └── workflow_execution_process.md  # Explanation of workflow execution
 ├── logs/                         # Directory where execution logs are saved
 ├── exports/                      # Directory where context exports are saved
 ├── test_data/                    # Directory for test data and samples
@@ -91,9 +97,11 @@ A default `config.ini` is created if missing. Settings can be modified via the "
     - Save reusable sequences as templates (currently requires manual file/DB operation - UI needed).
     - Use the `TemplateAction` type in the Action Editor to reference a saved template by name.
 4.  **Run Workflows**: Use the "Workflow Runner" tab. Select workflow/credential, click "Run". Execution is backgrounded; logs appear. Use "Stop" to request cancellation.
+    - **Default Workflow**: AutoQliq comes with a default workflow that demonstrates basic functionality.
 5.  **Manage Settings**: Use the "Settings" tab to view/modify configuration. Click "Save Settings" to persist changes.
 6.  **Execution Logs**: Execution logs are saved in the `logs/` directory.
 7.  **Context Exports**: Context exports are saved in the `exports/` directory.
+8.  **Documentation**: Check out the documentation in the `docs/` folder for detailed guides and tutorials.
 
 ## Workflow Action Types
 

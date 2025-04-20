@@ -72,8 +72,9 @@ class ActionBase(IAction, ABC):
         Raises:
             ValidationError: If validation fails (recommended).
         """
+        logger.debug(f"Validating base action: {self.action_type} (Name: {self.name})")
         if not isinstance(self.name, str) or not self.name:
-             raise ValidationError("Action name must be a non-empty string.", field_name="name")
+             raise ValidationError("Action name must be a non-empty string.", field_name="name", action_name=self.name, action_type=self.action_type)
         return True
 
     @abstractmethod
