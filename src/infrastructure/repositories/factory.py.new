@@ -1,0 +1,239 @@
+"""Repository factory for AutoQliq.
+
+This module provides a factory for creating repository instances based on
+configuration options.
+"""
+
+import os
+import logging
+from typing import Dict, Any, Optional, Union, TYPE_CHECKING
+
+from src.core.exceptions import ConfigError
+from src.core.interfaces.repository.workflow import IWorkflowRepository
+from src.core.interfaces.repository.credential import ICredentialRepository
+from src.core.interfaces.security import IEncryptionService
+from src.infrastructure.repositories.workflow import FileSystemWorkflowRepository, DatabaseWorkflowRepository
+from src.infrastructure.repositories.credential import FileSystemCredentialRepository, DatabaseCredentialRepository
+from src.infrastructure.security.encryption_service import EncryptionService
+
+# Optional database dependencies
+try:
+    from src.infrastructure.common.connection_manager import ConnectionManager
+    DATABASE_SUPPORT = True
+except ImportError:
+    DATABASE_SUPPORT = False
+
+logger = logging.getLogger(__name__)
+
+class RepositoryFactory:
+    """Factory for creating repository instances.
+    
+    This class provides methods for creating repository instances based on
+    configuration options. It supports file system and database repositories.
+    """
+    
+    # Repository type constants
+    FILE_SYSTEM = "file_system"
+    DATABASE = "database"
+    
+    @staticmethod
+    def create_workflow_repository(
+        repo_type: str = FILE_SYSTEM,
+        **options: Any
+    ) -> IWorkflowRepository:
+        """Create a workflow repository.
+        
+        Args:
+            repo_type: Type of repository to create ("file_system" or "database")
+            **options: Additional options for the repository
+                For file_system:
+                    directory_path: Path to the directory where workflows are stored
+                    create_if_missing: Whether to create the directory if it doesn't exist
+                For database:
+                    db_path: Path to the SQLite database file
+                
+        Returns:
+            Workflow repository instance
+            
+        Raises:
+            ConfigError: If the repository type is invalid or required options are missing
+        """
+        logger.info(f"Creating workflow repository of type: {repo_type}")
+        
+        if repo_type == RepositoryFactory.FILE_SYSTEM:
+            directory_path = options.get("directory_path")
+            if not directory_path:
+                raise ConfigError("directory_path is required for file_system repository")
+            
+            create_if_missing = options.get("create_if_missing", True)
+            
+            return FileSystemWorkflowRepository(
+                directory_path=directory_path,
+                create_if_missing=create_if_missing
+            )
+        elif repo_type == RepositoryFactory.DATABASE:
+            # Check if database support is available
+            if not DATABASE_SUPPORT:
+                raise ConfigError("Database repository support not available")
+            
+            db_path = options.get("db_path")
+            if not db_path:
+                raise ConfigError("db_path is required for database repository")
+            
+            return DatabaseWorkflowRepository(
+                db_path=db_path,
+                **options
+            )
+        else:
+            raise ConfigError(f"Invalid repository type: {repo_type}")
+    
+    @staticmethod
+    def create_credential_repository(
+        repo_type: str = FILE_SYSTEM,
+        encryption_service: Optional[IEncryptionService] = None,
+        **options: Any
+    ) -> ICredentialRepository:
+        """Create a credential repository.
+        
+        Args:
+            repo_type: Type of repository to create ("file_system" or "database")
+            encryption_service: Service for encrypting and decrypting credentials
+                If None, a default encryption service will be created
+            **options: Additional options for the repository
+                For file_system:
+                    directory_path: Path to the directory where credentials are stored
+                    create_if_missing: Whether to create the directory if it doesn't exist
+                For database:
+                    db_path: Path to the SQLite database file
+                
+        Returns:
+            Credential repository instance
+            
+        Raises:
+            ConfigError: If the repository type is invalid or required options are missing
+        """
+        logger.info(f"Creating credential repository of type: {repo_type}")
+        
+        # Create a default encryption service if none is provided
+        if not encryption_service:
+            encryption_key = options.get("encryption_key")
+            if not encryption_key:
+                raise ConfigError("encryption_key is required when no encryption_service is provided")
+            
+            encryption_service = EncryptionService(key=encryption_key)
+        
+        if repo_type == RepositoryFactory.FILE_SYSTEM:
+            directory_path = options.get("directory_path")
+            if not directory_path:
+                raise ConfigError("directory_path is required for file_system repository")
+            
+            create_if_missing = options.get("create_if_missing", True)
+            
+            return FileSystemCredentialRepository(
+                directory_path=directory_path,
+                encryption_service=encryption_service,
+                create_if_missing=create_if_missing
+            )
+        elif repo_type == RepositoryFactory.DATABASE:
+            # Check if database support is available
+            if not DATABASE_SUPPORT:
+                raise ConfigError("Database repository support not available")
+            
+            db_path = options.get("db_path")
+            if not db_path:
+                raise ConfigError("db_path is required for database repository")
+            
+            return DatabaseCredentialRepository(
+                db_path=db_path,
+                encryption_service=encryption_service,
+                **options
+            )
+        else:
+            raise ConfigError(f"Invalid repository type: {repo_type}")
+    
+    @staticmethod
+    def create_repositories_from_config(config: Dict[str, Any]) -> Dict[str, Union[IWorkflowRepository, ICredentialRepository]]:
+        """Create repositories from a configuration dictionary.
+        
+        Args:
+            config: Configuration dictionary
+                Should contain "repositories" section with repository settings
+                
+        Returns:
+            Dictionary containing the created repositories
+            
+        Raises:
+            ConfigError: If the configuration is invalid
+        """
+        logger.info("Creating repositories from configuration")
+        
+        # Extract repository configuration
+        repo_config = config.get("repositories", {})
+        
+        # Get repository type
+        repo_type = repo_config.get("type", RepositoryFactory.FILE_SYSTEM)
+        
+        # Create repositories based on type
+        if repo_type == RepositoryFactory.FILE_SYSTEM:
+            # Get base directory
+            base_dir = repo_config.get("base_directory")
+            if not base_dir:
+                raise ConfigError("base_directory is required for file system repositories")
+            
+            # Create workflow repository
+            workflow_dir = os.path.join(base_dir, repo_config.get("workflow_subdir", "workflows"))
+            workflow_repo = RepositoryFactory.create_workflow_repository(
+                repo_type=RepositoryFactory.FILE_SYSTEM,
+                directory_path=workflow_dir,
+                create_if_missing=repo_config.get("create_if_missing", True)
+            )
+            
+            # Create credential repository
+            credential_dir = os.path.join(base_dir, repo_config.get("credential_subdir", "credentials"))
+            encryption_key = repo_config.get("encryption_key")
+            if not encryption_key:
+                raise ConfigError("encryption_key is required for credential repository")
+            
+            credential_repo = RepositoryFactory.create_credential_repository(
+                repo_type=RepositoryFactory.FILE_SYSTEM,
+                directory_path=credential_dir,
+                encryption_key=encryption_key,
+                create_if_missing=repo_config.get("create_if_missing", True)
+            )
+            
+        elif repo_type == RepositoryFactory.DATABASE:
+            # Check if database support is available
+            if not DATABASE_SUPPORT:
+                raise ConfigError("Database repository support not available")
+            
+            # Get database path
+            db_path = repo_config.get("db_path")
+            if not db_path:
+                raise ConfigError("db_path is required for database repositories")
+            
+            # Create workflow repository
+            workflow_repo = RepositoryFactory.create_workflow_repository(
+                repo_type=RepositoryFactory.DATABASE,
+                db_path=db_path,
+                create_if_missing=repo_config.get("create_if_missing", True)
+            )
+            
+            # Create credential repository
+            encryption_key = repo_config.get("encryption_key")
+            if not encryption_key:
+                raise ConfigError("encryption_key is required for credential repository")
+            
+            credential_repo = RepositoryFactory.create_credential_repository(
+                repo_type=RepositoryFactory.DATABASE,
+                db_path=db_path,
+                encryption_key=encryption_key,
+                create_if_missing=repo_config.get("create_if_missing", True)
+            )
+            
+        else:
+            raise ConfigError(f"Unsupported repository type: {repo_type}")
+        
+        return {
+            "workflow_repository": workflow_repo,
+            "credential_repository": credential_repo
+        }

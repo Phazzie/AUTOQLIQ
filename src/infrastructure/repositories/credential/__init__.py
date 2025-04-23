@@ -4,6 +4,10 @@ This package provides implementations of the ICredentialRepository interface
 for different storage backends.
 """
 
-# We'll add imports for the credential repository implementations here as we create them
+from src.infrastructure.repositories.credential.file_system_credential_repository import FileSystemCredentialRepository
+from src.infrastructure.repositories.credential.database_credential_repository import DatabaseCredentialRepository
 
-__all__ = []  # We'll add exports for the credential repository implementations here as we create them
+__all__ = [
+    "FileSystemCredentialRepository",
+    "DatabaseCredentialRepository"
+]

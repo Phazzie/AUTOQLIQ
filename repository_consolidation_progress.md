@@ -25,17 +25,17 @@
 ## Phase 2: New Repository Implementation
 
 ### 2.1 Implement Workflow Repositories
-- [ ] Implement `FileSystemWorkflowRepository` class
-- [ ] Implement `DatabaseWorkflowRepository` class
+- [x] Implement `FileSystemWorkflowRepository` class
+- [x] Implement `DatabaseWorkflowRepository` class
 - [ ] Write tests for new implementations
 
 ### 2.2 Implement Credential Repositories
-- [ ] Implement `FileSystemCredentialRepository` class
-- [ ] Implement `DatabaseCredentialRepository` class
+- [x] Implement `FileSystemCredentialRepository` class
+- [x] Implement `DatabaseCredentialRepository` class
 - [ ] Write tests for new implementations
 
 ### 2.3 Implement Repository Factory
-- [ ] Implement new `RepositoryFactory` class
+- [x] Implement new `RepositoryFactory` class
 - [ ] Write tests for new factory
 
 ## Phase 3: Migration & Cleanup
@@ -52,8 +52,6 @@
 
 ## Next Steps
 
-1. Implement the new workflow repository classes
-2. Implement the new credential repository classes
-3. Implement the new repository factory
-4. Write tests for the new implementations
-5. Update client code to use the new implementations
+1. Write tests for the new implementations
+2. Update client code to use the new implementations
+3. Create a plan for removing deprecated code

@@ -4,6 +4,10 @@ This package provides implementations of the IWorkflowRepository interface
 for different storage backends.
 """
 
-# We'll add imports for the workflow repository implementations here as we create them
+from src.infrastructure.repositories.workflow.file_system_workflow_repository import FileSystemWorkflowRepository
+from src.infrastructure.repositories.workflow.database_workflow_repository import DatabaseWorkflowRepository
 
-__all__ = []  # We'll add exports for the workflow repository implementations here as we create them
+__all__ = [
+    "FileSystemWorkflowRepository",
+    "DatabaseWorkflowRepository"
+]
