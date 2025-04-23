@@ -1,224 +1,299 @@
-"""File system repository implementation for AutoQliq."""
-import json
-import os
-from typing import Any, TypeVar, Optional, List
+"""File system repository implementation for AutoQliq.
 
-from src.core.exceptions import AutoQliqError, RepositoryError
+This module provides a file system-based implementation of the Repository interface.
+"""
+
+import os
+import json
+import logging
+from typing import Any, Dict, TypeVar, Generic, Optional, List
+from pathlib import Path
+
+from src.core.exceptions import RepositoryError, ValidationError, SerializationError
 from src.infrastructure.repositories.base.repository import Repository
 
 # Type variable for the entity type
 T = TypeVar('T')
 
 class FileSystemRepository(Repository[T]):
-    """Base class for file system repository implementations.
+    """
+    Base class for file system repository implementations.
 
     This class provides common functionality for file system repository implementations,
     such as file operations, serialization, and error handling.
 
     Attributes:
-        logger: Logger for recording repository operations and errors
+        logger (logging.Logger): Logger for recording repository operations and errors
     """
 
-    def save(self, entity_id: str, entity: T) -> None:
-        """Save an entity to the repository.
+    def __init__(self, logger_name: str, base_directory: str = None):
+        """
+        Initialize a new file system repository instance.
 
         Args:
-            entity_id: The ID of the entity
-            entity: The entity to save
+            logger_name (str): Name for the repository's logger
+            base_directory (str, optional): Base directory for the repository. If provided,
+                the directory will be created if it doesn't exist.
+        """
+        super().__init__(logger_name)
+
+        if base_directory:
+            self._ensure_directory_exists(base_directory)
+            self.base_directory = base_directory
+            self.logger.debug(f"Repository base directory: {self.base_directory}")
+
+    def save(self, entity_id: str, entity: T) -> None:
+        """
+        Save an entity to the repository.
+
+        Args:
+            entity_id (str): ID of the entity to save
+            entity (T): Entity to save
 
         Raises:
-            RepositoryError: If the entity cannot be saved
+            RepositoryError: If the operation fails
+            ValidationError: If the entity or ID is invalid
         """
-        self._validate_entity_id(entity_id)
-        self._log_operation("Saving entity", entity_id)
-
         try:
+            self._validate_entity_id(entity_id)
             self._save_entity(entity_id, entity)
+            self._log_operation("Saved entity", entity_id)
+        except ValidationError as e:
+            self.logger.error(f"Validation error saving entity {entity_id}: {e}")
+            raise
         except Exception as e:
-            error_msg = f"Failed to save entity: {entity_id}"
-            self.logger.error(error_msg, exc_info=True)
-            raise RepositoryError(error_msg, entity_id=entity_id, cause=e)
+            error_msg = f"Failed to save entity {entity_id}: {e}"
+            self.logger.error(error_msg)
+            raise RepositoryError(error_msg, cause=e) from e
 
     def get(self, entity_id: str) -> Optional[T]:
-        """Get an entity from the repository.
+        """
+        Get an entity from the repository by its ID.
 
         Args:
-            entity_id: The ID of the entity
+            entity_id (str): ID of the entity to get
 
         Returns:
-            The entity, or None if not found
+            Optional[T]: The entity if found, None otherwise
 
         Raises:
-            RepositoryError: If the entity cannot be retrieved
+            RepositoryError: If the operation fails
+            ValidationError: If the entity ID is invalid
         """
-        self._validate_entity_id(entity_id)
-        self._log_operation("Getting entity", entity_id)
-
         try:
-            return self._get_entity(entity_id)
+            self._validate_entity_id(entity_id)
+            entity = self._get_entity(entity_id)
+            if entity:
+                self._log_operation("Retrieved entity", entity_id)
+            else:
+                self.logger.debug(f"Entity {entity_id} not found")
+            return entity
+        except ValidationError as e:
+            self.logger.error(f"Validation error retrieving entity {entity_id}: {e}")
+            raise
         except Exception as e:
-            error_msg = f"Failed to get entity: {entity_id}"
-            self.logger.error(error_msg, exc_info=True)
-            raise RepositoryError(error_msg, entity_id=entity_id, cause=e)
+            error_msg = f"Failed to retrieve entity {entity_id}: {e}"
+            self.logger.error(error_msg)
+            raise RepositoryError(error_msg, cause=e) from e
 
-    def delete(self, entity_id: str) -> None:
-        """Delete an entity from the repository.
+    def delete(self, entity_id: str) -> bool:
+        """
+        Delete an entity from the repository.
 
         Args:
-            entity_id: The ID of the entity
+            entity_id (str): ID of the entity to delete
+
+        Returns:
+            bool: True if the entity was deleted, False if it wasn't found
 
         Raises:
-            RepositoryError: If the entity cannot be deleted
+            RepositoryError: If the operation fails
+            ValidationError: If the entity ID is invalid
         """
-        self._validate_entity_id(entity_id)
-        self._log_operation("Deleting entity", entity_id)
-
         try:
-            self._delete_entity(entity_id)
+            self._validate_entity_id(entity_id)
+            result = self._delete_entity(entity_id)
+            if result:
+                self._log_operation("Deleted entity", entity_id)
+            else:
+                self.logger.debug(f"Entity {entity_id} not found for deletion")
+            return result
+        except ValidationError as e:
+            self.logger.error(f"Validation error deleting entity {entity_id}: {e}")
+            raise
         except Exception as e:
-            error_msg = f"Failed to delete entity: {entity_id}"
-            self.logger.error(error_msg, exc_info=True)
-            raise RepositoryError(error_msg, entity_id=entity_id, cause=e)
+            error_msg = f"Failed to delete entity {entity_id}: {e}"
+            self.logger.error(error_msg)
+            raise RepositoryError(error_msg, cause=e) from e
 
     def list(self) -> List[str]:
-        """List all entity IDs in the repository.
+        """
+        List all entity IDs in the repository.
 
         Returns:
-            A list of entity IDs
+            List[str]: List of entity IDs
 
         Raises:
-            RepositoryError: If the entities cannot be listed
+            RepositoryError: If the operation fails
         """
-        self._log_operation("Listing entities", "all")
-
         try:
-            return self._list_entities()
+            entity_ids = self._list_entities()
+            self._log_operation("Listed entities", details=f"Found {len(entity_ids)} entities")
+            return entity_ids
         except Exception as e:
-            error_msg = "Failed to list entities"
-            self.logger.error(error_msg, exc_info=True)
-            raise RepositoryError(error_msg, cause=e)
+            error_msg = f"Failed to list entities: {e}"
+            self.logger.error(error_msg)
+            raise RepositoryError(error_msg, cause=e) from e
+
+    # --- Template Methods to be Implemented by Subclasses ---
 
     def _save_entity(self, entity_id: str, entity: T) -> None:
-        """Save an entity to a file.
-
-        This method should be overridden by subclasses to implement entity-specific saving logic.
+        """
+        Template method for saving an entity to the file system.
 
         Args:
-            entity_id: The ID of the entity
-            entity: The entity to save
+            entity_id (str): ID of the entity to save
+            entity (T): Entity to save
 
         Raises:
-            Exception: If the entity cannot be saved
+            NotImplementedError: This method must be implemented by subclasses
         """
         raise NotImplementedError("Subclasses must implement _save_entity")
 
     def _get_entity(self, entity_id: str) -> Optional[T]:
-        """Get an entity from a file.
-
-        This method should be overridden by subclasses to implement entity-specific retrieval logic.
+        """
+        Template method for retrieving an entity from the file system.
 
         Args:
-            entity_id: The ID of the entity
+            entity_id (str): ID of the entity to retrieve
 
         Returns:
-            The entity, or None if not found
+            Optional[T]: The entity if found, None otherwise
 
         Raises:
-            Exception: If the entity cannot be retrieved
+            NotImplementedError: This method must be implemented by subclasses
         """
         raise NotImplementedError("Subclasses must implement _get_entity")
 
-    def _delete_entity(self, entity_id: str) -> None:
-        """Delete an entity file.
-
-        This method should be overridden by subclasses to implement entity-specific deletion logic.
+    def _delete_entity(self, entity_id: str) -> bool:
+        """
+        Template method for deleting an entity from the file system.
 
         Args:
-            entity_id: The ID of the entity
+            entity_id (str): ID of the entity to delete
+
+        Returns:
+            bool: True if the entity was deleted, False if it wasn't found
 
         Raises:
-            Exception: If the entity cannot be deleted
+            NotImplementedError: This method must be implemented by subclasses
         """
         raise NotImplementedError("Subclasses must implement _delete_entity")
 
     def _list_entities(self) -> List[str]:
-        """List all entity IDs in the repository.
-
-        This method should be overridden by subclasses to implement entity-specific listing logic.
+        """
+        Template method for listing all entity IDs in the file system.
 
         Returns:
-            A list of entity IDs
+            List[str]: List of entity IDs
 
         Raises:
-            Exception: If the entities cannot be listed
+            NotImplementedError: This method must be implemented by subclasses
         """
         raise NotImplementedError("Subclasses must implement _list_entities")
 
+    # --- File System Helper Methods ---
+
     def _ensure_directory_exists(self, directory_path: str) -> None:
-        """Ensure a directory exists.
+        """
+        Ensure that a directory exists, creating it if necessary.
 
         Args:
-            directory_path: The path to the directory
+            directory_path (str): Path to the directory
 
         Raises:
-            AutoQliqError: If the directory cannot be created
+            RepositoryError: If the directory cannot be created
         """
-        if not os.path.exists(directory_path):
-            try:
-                os.makedirs(directory_path, exist_ok=True)
-                self.logger.debug(f"Created directory: {directory_path}")
-            except (IOError, PermissionError) as e:
-                error_msg = f"Failed to create directory {directory_path}: {str(e)}"
-                self.logger.error(error_msg)
-                raise AutoQliqError(error_msg, cause=e)
+        if not directory_path:
+            return
+
+        try:
+            os.makedirs(directory_path, exist_ok=True)
+            self.logger.debug(f"Ensured directory exists: {directory_path}")
+        except Exception as e:
+            error_msg = f"Failed to create directory {directory_path}: {e}"
+            self.logger.error(error_msg)
+            raise RepositoryError(error_msg, cause=e) from e
 
     def _read_json_file(self, file_path: str) -> Any:
-        """Read data from a JSON file.
+        """
+        Read and parse a JSON file.
 
         Args:
-            file_path: The path to the JSON file
+            file_path (str): Path to the JSON file
 
         Returns:
-            The parsed JSON data
+            Any: Parsed JSON data
 
         Raises:
-            FileNotFoundError: If the file doesn't exist
-            json.JSONDecodeError: If the file contains invalid JSON
+            RepositoryError: If the file cannot be read or parsed
         """
-        self.logger.debug(f"Reading JSON file: {file_path}")
-        with open(file_path, 'r') as file:
-            data = json.load(file)
-            self.logger.debug(f"Successfully read JSON file: {file_path}")
-            return data
+        try:
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File not found: {file_path}")
+
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except FileNotFoundError as e:
+            self.logger.debug(f"File not found: {file_path}")
+            raise e
+        except json.JSONDecodeError as e:
+            error_msg = f"Invalid JSON in file {file_path}: {e}"
+            self.logger.error(error_msg)
+            raise SerializationError(error_msg, cause=e) from e
+        except Exception as e:
+            error_msg = f"Failed to read file {file_path}: {e}"
+            self.logger.error(error_msg)
+            raise RepositoryError(error_msg, cause=e) from e
 
     def _write_json_file(self, file_path: str, data: Any) -> None:
-        """Write data to a JSON file.
+        """
+        Write data to a JSON file.
 
         Args:
-            file_path: The path to the JSON file
-            data: The data to write
+            file_path (str): Path to the JSON file
+            data (Any): Data to write
 
         Raises:
-            IOError: If the file cannot be written
-            TypeError: If the data cannot be serialized to JSON
+            RepositoryError: If the file cannot be written
         """
-        self.logger.debug(f"Writing JSON file: {file_path}")
         try:
-            with open(file_path, 'w') as file:
-                json.dump(data, file, indent=2)
-                self.logger.debug(f"Successfully wrote JSON file: {file_path}")
-        except (IOError, PermissionError) as e:
-            error_msg = f"Failed to write file {file_path}: {str(e)}"
+            # Ensure the directory exists
+            directory = os.path.dirname(file_path)
+            if directory:
+                self._ensure_directory_exists(directory)
+
+            # Write the file atomically using a temporary file
+            temp_file = f"{file_path}.tmp"
+            with open(temp_file, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+            # Replace the original file with the temporary file
+            os.replace(temp_file, file_path)
+            self.logger.debug(f"Wrote file: {file_path}")
+        except Exception as e:
+            error_msg = f"Failed to write file {file_path}: {e}"
             self.logger.error(error_msg)
-            raise IOError(error_msg) from e
+            raise RepositoryError(error_msg, cause=e) from e
 
     def _file_exists(self, file_path: str) -> bool:
-        """Check if a file exists.
+        """
+        Check if a file exists.
 
         Args:
-            file_path: The path to the file
+            file_path (str): Path to the file
 
         Returns:
-            True if the file exists, False otherwise
+            bool: True if the file exists, False otherwise
         """
-        return os.path.exists(file_path)
+        return os.path.exists(file_path) and os.path.isfile(file_path)

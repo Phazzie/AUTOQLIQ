@@ -1,11 +1,13 @@
-"""Abstract base class for SQLite database repository implementations."""
+"""Abstract base class for SQLite database repository implementations.
+
+This module provides a database-based implementation of the IBaseRepository interface.
+"""
 import abc
 import logging
 from typing import Any, Dict, List, Optional, TypeVar, Generic
 
-# Assuming core interfaces, exceptions, and common utilities are defined
-# No direct dependency on IRepository interface here, concrete classes implement specific ones
 from src.core.exceptions import RepositoryError, ValidationError
+from src.core.interfaces.repository.base import IBaseRepository
 from src.infrastructure.common.database_connection import ConnectionManager
 from src.infrastructure.common.logger_factory import LoggerFactory
 from src.infrastructure.common.validators import EntityValidator
@@ -13,7 +15,7 @@ from src.infrastructure.common.validators import EntityValidator
 # Type variable for the entity type managed by the repository
 T = TypeVar('T')
 
-class DatabaseRepository(Generic[T], abc.ABC):
+class DatabaseRepository(IBaseRepository[T], Generic[T], abc.ABC):
     """
     Abstract base class for repositories using an SQLite database backend.
 

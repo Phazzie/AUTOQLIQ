@@ -1,89 +1,142 @@
-"""Base repository abstract class for AutoQliq."""
+"""Base repository abstract class for AutoQliq.
+
+This module defines the abstract base class for all repository implementations,
+providing common functionality and enforcing a consistent interface.
+
+This class implements the IBaseRepository interface from src.core.interfaces.repository.base.
+"""
+
 import abc
 import logging
-from typing import TypeVar, Generic, Optional, List
+from typing import TypeVar, Generic, Optional, List, Any
 
-# Assuming core interfaces, exceptions, and common utilities are defined
-# No direct dependency on IRepository interfaces here, concrete classes implement specific ones
 from src.core.exceptions import RepositoryError, ValidationError
+from src.core.interfaces.repository.base import IBaseRepository
 from src.infrastructure.common.logger_factory import LoggerFactory
-from src.infrastructure.common.validators import EntityValidator
 
 # Type variable for the entity type managed by the repository
 T = TypeVar('T')
 
-class Repository(abc.ABC, Generic[T]):
+class Repository(IBaseRepository[T], abc.ABC, Generic[T]):
     """
     Abstract base class for repository implementations.
 
-    Provides common infrastructure like logging and basic ID validation.
-    Concrete subclasses must implement specific repository interfaces
-    (e.g., IWorkflowRepository, ICredentialRepository).
+    This class defines the common interface and behavior for all repositories
+    in the system. It provides shared functionality and enforces a consistent
+    approach to repository operations.
 
     Attributes:
-        logger (logging.Logger): Logger instance specific to the repository implementation.
+        logger (logging.Logger): Logger for recording repository operations and errors
     """
 
-    def __init__(self, logger_name: Optional[str] = None):
+    def __init__(self, logger_name: str):
         """
-        Initialize a new Repository instance.
+        Initialize a new repository instance.
 
         Args:
-            logger_name (Optional[str]): The name for the logger. If None, defaults
-                                         to the name of the concrete subclass.
+            logger_name (str): Name for the repository's logger
         """
-        if logger_name is None:
-            logger_name = self.__class__.__name__ # Use subclass name if not provided
-        self.logger = LoggerFactory.get_logger(f"repository.{logger_name}")
-        self.logger.info(f"{self.__class__.__name__} initialized.")
+        self.logger = logging.getLogger(logger_name)
+        self.logger.info(f"Initializing {self.__class__.__name__}")
 
-    # Note: Abstract methods for save, get, delete, list are NOT defined here.
-    # Concrete implementations should implement methods defined in the specific
-    # core interfaces (IWorkflowRepository, ICredentialRepository).
-    # This base class provides shared utilities.
+    # --- Abstract Methods ---
 
-    # --- Common Helper Methods ---
-
-    def _validate_entity_id(self, entity_id: str, entity_type: Optional[str] = None) -> None:
+    @abc.abstractmethod
+    def save(self, entity_id: str, entity: T) -> None:
         """
-        Validate the entity ID using common rules.
+        Save an entity to the repository.
 
         Args:
-            entity_id (str): The ID to validate.
-            entity_type (Optional[str]): The type name of the entity (for error messages).
-                                         Defaults based on class name if possible, else 'Entity'.
+            entity_id (str): Unique identifier for the entity
+            entity (T): Entity to save
 
         Raises:
-            ValidationError: If the entity ID is invalid.
+            RepositoryError: If the operation fails
+            ValidationError: If the entity or ID is invalid
         """
-        if entity_type is None:
-             # Try to infer from class name (e.g., "Workflow" from "WorkflowRepository")
-             class_name = self.__class__.__name__
-             if "Repository" in class_name:
-                 entity_type = class_name.replace("Database", "").replace("FileSystem", "").replace("Repository", "")
-             else:
-                 entity_type = "Entity"
-        try:
-             EntityValidator.validate_entity_id(entity_id, entity_type=entity_type)
-             # self.logger.debug(f"Validated {entity_type} ID: '{entity_id}'") # Logging done by caller if needed
-        except ValidationError as e:
-             # Log the validation error before re-raising
-             self.logger.warning(f"Invalid {entity_type} ID validation: {e}")
-             raise # Re-raise the original ValidationError
+        pass
 
+    @abc.abstractmethod
+    def get(self, entity_id: str) -> Optional[T]:
+        """
+        Get an entity from the repository by its ID.
 
-    def _log_operation(self, operation: str, entity_id: Optional[str] = None, details: str = "") -> None:
+        Args:
+            entity_id (str): ID of the entity to get
+
+        Returns:
+            Optional[T]: The entity if found, None otherwise
+
+        Raises:
+            RepositoryError: If the operation fails
+        """
+        pass
+
+    @abc.abstractmethod
+    def delete(self, entity_id: str) -> bool:
+        """
+        Delete an entity from the repository.
+
+        Args:
+            entity_id (str): ID of the entity to delete
+
+        Returns:
+            bool: True if the entity was deleted, False if it wasn't found
+
+        Raises:
+            RepositoryError: If the operation fails
+        """
+        pass
+
+    @abc.abstractmethod
+    def list(self) -> List[str]:
+        """
+        List all entity IDs in the repository.
+
+        Returns:
+            List[str]: List of entity IDs
+
+        Raises:
+            RepositoryError: If the operation fails
+        """
+        pass
+
+    # --- Helper Methods ---
+
+    def _validate_entity_id(self, entity_id: str) -> None:
+        """
+        Validate an entity ID.
+
+        Args:
+            entity_id (str): ID to validate
+
+        Raises:
+            ValidationError: If the ID is invalid
+        """
+        if not entity_id:
+            raise ValidationError("Entity ID cannot be empty")
+
+        if not isinstance(entity_id, str):
+            raise ValidationError(f"Entity ID must be a string, got {type(entity_id).__name__}")
+
+        # Add additional validation rules if needed
+        if len(entity_id) > 255:
+            raise ValidationError("Entity ID is too long (max 255 characters)")
+
+    def _log_operation(self, operation: str, entity_id: Optional[str] = None,
+                      details: Optional[str] = None) -> None:
         """
         Log a repository operation.
 
         Args:
-            operation (str): Description of the operation (e.g., "Saving", "Loading list").
-            entity_id (Optional[str]): The ID of the entity involved, if applicable.
-            details (str): Optional additional details for the log message.
+            operation (str): Name of the operation
+            entity_id (Optional[str]): ID of the affected entity, if any
+            details (Optional[str]): Additional operation details
         """
-        log_message = operation
+        message = f"{operation}"
         if entity_id:
-            log_message += f" ID: '{entity_id}'"
+            message += f" {entity_id}"
         if details:
-             log_message += f" ({details})"
-        self.logger.debug(log_message)
+            message += f": {details}"
+
+        self.logger.info(message)

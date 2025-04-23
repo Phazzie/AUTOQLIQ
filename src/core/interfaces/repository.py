@@ -1,10 +1,14 @@
 ﻿################################################################################
-"""Repository interfaces for AutoQliq.
+"""DEPRECATED: Repository interfaces for AutoQliq.
+
+This module is DEPRECATED and will be removed in a future release.
+Use the new interfaces in src/core/interfaces/repository/ instead.
 
 This module defines the interfaces for repository implementations that provide
 storage and retrieval capabilities for workflows and credentials.
 """
 import abc
+import warnings
 from typing import List, Dict, Any, Optional, TYPE_CHECKING
 
 # Use TYPE_CHECKING to avoid circular imports
@@ -12,8 +16,22 @@ if TYPE_CHECKING:
     from src.core.interfaces.action import IAction
 
 
+def _deprecated(cls):
+    warnings.warn(
+        f"{cls.__name__} is deprecated. Use the new interfaces in src.core.interfaces.repository instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return cls
+
+
+@_deprecated
 class IWorkflowRepository(abc.ABC):
-    """Interface for workflow repository implementations."""
+    """DEPRECATED: Interface for workflow repository implementations.
+
+    This interface is deprecated and will be removed in a future release.
+    Use src.core.interfaces.repository.IWorkflowRepository instead.
+    """
 
     # --- Workflow Operations ---
     @abc.abstractmethod
@@ -68,8 +86,13 @@ class IWorkflowRepository(abc.ABC):
         pass
 
 
+@_deprecated
 class ICredentialRepository(abc.ABC):
-    """Interface for credential repository implementations."""
+    """DEPRECATED: Interface for credential repository implementations.
+
+    This interface is deprecated and will be removed in a future release.
+    Use src.core.interfaces.repository.ICredentialRepository instead.
+    """
 
     @abc.abstractmethod
     def save(self, credential: Dict[str, str]) -> None:
@@ -92,8 +115,13 @@ class ICredentialRepository(abc.ABC):
         pass
 
 # --- New Reporting Repository Interface ---
+@_deprecated
 class IReportingRepository(abc.ABC):
-    """Interface for storing and retrieving workflow execution logs/results."""
+    """DEPRECATED: Interface for storing and retrieving workflow execution logs/results.
+
+    This interface is deprecated and will be removed in a future release.
+    Use src.core.interfaces.repository.IReportingRepository instead.
+    """
 
     @abc.abstractmethod
     def save_execution_log(self, execution_log: Dict[str, Any]) -> None:
