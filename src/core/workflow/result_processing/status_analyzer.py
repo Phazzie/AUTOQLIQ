@@ -51,6 +51,30 @@ class StatusAnalyzer(IStatusAnalyzer):
             Tuple[str, Optional[str], str]: Final status, error message, and summary
         """
         if error:
-            return self._error_analyzer.analyze_error(error)
+            return self._analyze_error(error)
 
+        return self._analyze_results(action_results)
+
+    def _analyze_error(self, error: Exception) -> Tuple[str, Optional[str], str]:
+        """
+        Analyze the error to determine the final status, error message, and summary.
+
+        Args:
+            error: Exception that caused the workflow to fail
+
+        Returns:
+            Tuple[str, Optional[str], str]: Final status, error message, and summary
+        """
+        return self._error_analyzer.analyze_error(error)
+
+    def _analyze_results(self, action_results: List[ActionResult]) -> Tuple[str, Optional[str], str]:
+        """
+        Analyze the action results to determine the final status, error message, and summary.
+
+        Args:
+            action_results: Results of the executed actions
+
+        Returns:
+            Tuple[str, Optional[str], str]: Final status, error message, and summary
+        """
         return self._result_analyzer.analyze_results(action_results)
